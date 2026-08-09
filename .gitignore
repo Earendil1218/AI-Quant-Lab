@@ -3,3 +3,13 @@
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+
+# 本机配置与敏感凭据：仅保留 .env.example 模板在仓库中
+.env
+.env.*
+!.env.example
+secrets/
+*.key
+*.pem
+*.p12
+*.pfx

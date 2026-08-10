@@ -44,7 +44,7 @@ def main() -> None:
     ib = IB()
     try:
         print(f"连接 TWS 模拟账户：{HOST}:{PORT} ...")
-        ib.connect(HOST, PORT, clientId=CLIENT_ID, timeout=10)
+        ib.connect(HOST, PORT, clientId=CLIENT_ID, timeout=10, readonly=True)
         print("连接成功。")
 
         print_account_summary(ib)

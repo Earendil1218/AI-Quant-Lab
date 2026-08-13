@@ -1,8 +1,15 @@
 .venv/
 .venv311/
 __pycache__/
-*.pyc
+*.py[cod]
 .ipynb_checkpoints/
+.vscode/
+
+# 行情数据文件保留在本地，仅跟踪空目录占位文件
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
 
 # 本机配置与敏感凭据：仅保留 .env.example 模板在仓库中
 .env

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pandas as pd
 from ib_insync import IB
 
 from broker.connection import connect_ibkr
@@ -14,6 +15,15 @@ from config.settings import (
     IBKR_HOST,
     IBKR_PORT,
 )
+from data.storage import build_market_data_path, load_market_data, save_market_data
+from data.validation import validate_market_data
+
+
+def _date_bounds(history: pd.DataFrame) -> tuple[object, object]:
+    """返回便于比较和展示的首尾日期。"""
+    start = pd.Timestamp(history["date"].iloc[0]).date()
+    end = pd.Timestamp(history["date"].iloc[-1]).date()
+    return start, end
 
 
 def main() -> None:
@@ -36,11 +46,25 @@ def main() -> None:
             duration=DEFAULT_DURATION,
             bar_size=DEFAULT_BAR_SIZE,
         )
+        validate_market_data(history)
 
-        print(f"\n已获取 {DEFAULT_SYMBOL} 历史数据：{len(history)} 条")
-        print(f"日期范围：{history['date'].iloc[0]} 至 {history['date'].iloc[-1]}")
+        output_path = build_market_data_path(DEFAULT_SYMBOL, DEFAULT_BAR_SIZE)
+        save_market_data(history, output_path)
+
+        loaded_history = load_market_data(output_path)
+        validate_market_data(loaded_history)
+
+        source_bounds = _date_bounds(history)
+        loaded_bounds = _date_bounds(loaded_history)
+        if len(loaded_history) != len(history) or loaded_bounds != source_bounds:
+            raise RuntimeError("CSV 重新读取后的行数或日期范围与原始数据不一致。")
+
+        print(f"\n已获取并验证 {DEFAULT_SYMBOL} 历史数据：{len(history)} 条")
+        print(f"日期范围：{source_bounds[0]} 至 {source_bounds[1]}")
+        print(f"已保存至：{output_path}")
+        print(f"重新读取并验证成功：{len(loaded_history)} 条")
         print("\n最近 5 条：")
-        print(history.tail().to_string(index=False))
+        print(loaded_history.tail().to_string(index=False))
     except Exception as exc:
         print(f"获取历史数据失败：{exc}")
     finally:

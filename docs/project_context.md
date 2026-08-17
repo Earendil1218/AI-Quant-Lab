@@ -4,7 +4,9 @@
 
 AI-Quant-Lab 是一个个人 AI 辅助量化研究实验室，用于系统学习和实践市场数据、定价、策略、回测与风险管理。
 
-项目的长期目标是建立一套职责清晰、可验证、可逐步扩展的量化研究平台，而不是尽快搭建自动交易系统。
+项目的长期目标是建立一套职责清晰、可验证、可逐步扩展并适合国际协作的量化研究平台，而不是尽快搭建自动交易系统。
+
+AI Quant Lab aims to become a clearly layered, verifiable, extensible quantitative research platform suitable for international collaboration—not a shortcut to automated trading.
 
 当前开发状态和近期任务见 `current_status.md`，长期阶段安排见 `roadmap.md`。
 
@@ -44,7 +46,7 @@ risk
 
 - `config` 管理运行参数，不包含业务流程。
 - `broker` 隔离外部券商 API 连接和市场数据访问，不承担数据持久化或策略逻辑。
-- `data` 负责数据存储、更新、清洗和数据质量；具体能力按后续阶段实现。
+- `data` 负责市场数据验证、标准化和持久化；raw 与 processed 数据具有明确边界。
 - `pricing` 负责定价模型、隐含波动率和 Greeks。
 - `strategies` 负责表达研究策略，不直接拥有券商连接。
 - `backtest` 负责基于历史数据验证策略。
@@ -114,3 +116,21 @@ Codex 不应：
 - `current_status.md`：项目现在做到哪里、已验证什么、下一步是什么。
 - `decisions.md`：重要技术和架构选择及其原因。
 - `daily_workflow.md`：每天开始、开发和收尾时如何操作。
+
+## 双语开源规范 / Bilingual Open-Source Convention
+
+### 中文
+
+- 文件、模块、类型、函数、变量和常量统一使用英文 identifier。
+- README、重要架构文档和状态文档同时提供完整中文与英文信息。
+- 新增或实际修改的重要 public API 使用简洁的中英双语 docstring。
+- 只有业务规则、金融约定、安全限制或非显然设计才增加双语注释。
+- 历史内容在未来实际修改时逐步迁移，不为翻译一次性重写整个仓库。
+
+### English
+
+- Files, modules, types, functions, variables, and constants use English identifiers.
+- The README and important architecture and status documentation provide complete information in both Chinese and English.
+- New or materially changed public APIs use concise bilingual docstrings.
+- Bilingual comments are reserved for business rules, financial conventions, safety constraints, and non-obvious design decisions.
+- Existing content migrates progressively when it is changed; internationalization does not require a repository-wide rewrite.

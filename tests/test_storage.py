@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
 
+from config.settings import PROCESSED_DATA_DIR, RAW_DATA_DIR
 from data.storage import (
     build_market_data_path,
     load_market_data,
@@ -30,6 +31,15 @@ def test_build_market_data_path_normalizes_symbol_and_daily_interval(tmp_path) -
     path = build_market_data_path(" nvda ", " 1  DAY ", tmp_path)
 
     assert path == tmp_path / "NVDA_1d.csv"
+
+
+def test_builds_distinct_raw_and_processed_paths() -> None:
+    raw_path = build_market_data_path("NVDA", "1 day", RAW_DATA_DIR)
+    processed_path = build_market_data_path("NVDA", "1 day", PROCESSED_DATA_DIR)
+
+    assert raw_path == RAW_DATA_DIR / "NVDA_1d.csv"
+    assert processed_path == PROCESSED_DATA_DIR / "NVDA_1d.csv"
+    assert raw_path != processed_path
 
 
 @pytest.mark.parametrize("symbol", ["", "   ", "NVDA/TEST", "../NVDA"])
@@ -60,6 +70,18 @@ def test_csv_round_trip_restores_date_column(tmp_path) -> None:
     actual = load_market_data(path)
 
     assert pd.api.types.is_datetime64_any_dtype(actual["date"])
+    assert_frame_equal(actual, expected, check_dtype=False)
+
+
+def test_processed_csv_round_trip_uses_processed_directory(tmp_path) -> None:
+    expected = sample_history()
+    processed_directory = tmp_path / "processed"
+    path = build_market_data_path("NVDA", "1 day", processed_directory)
+
+    saved_path = save_market_data(expected, path)
+    actual = load_market_data(saved_path)
+
+    assert saved_path == processed_directory / "NVDA_1d.csv"
     assert_frame_equal(actual, expected, check_dtype=False)
 
 

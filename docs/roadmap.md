@@ -58,36 +58,55 @@ Live Trading 研究（严格审批）
 
 完成标准：模块边界清晰，离线测试通过，并能从 Paper Trading 获取 NVDA 历史日线后正常断开。
 
-## Phase 2：历史数据存储与更新
+## Phase 2：历史数据存储基础 / Historical Data Storage Foundation
 
-目标：可靠地保存和增量更新历史市场数据。
+目标：可靠地保存、读取和验证原始历史市场数据。
+
+Goal: reliably persist, reload, and validate raw historical market data.
 
 主要能力：
 
 - 文件格式和命名规范
 - 原始数据与处理后数据的目录边界
-- 本地保存、读取和更新流程
-- 重复数据与日期范围处理
+- 本地保存与读取流程
+- 重复数据、时间顺序与日期范围验证
 - 基础数据完整性验证
 
 前置依赖：Phase 1。
 
-完成标准：可以重复运行更新流程，不产生无意义重复记录，并能验证保存结果。
+完成标准：可以保存和重新加载规范命名的 raw CSV，并验证重载结果。增量合并保留为后续独立能力。
 
-## Phase 3：数据清洗与股票研究
+Completion: canonically named raw CSV data can be saved, reloaded, and validated. Incremental merging remains a separate future capability.
 
-目标：把原始历史数据转化为适合研究的可靠数据集。
+## Phase 3：Processed 数据与股票研究 / Processed Data and Stock Research
+
+目标：先建立可靠的 processed market data 边界，再在其上发展股票研究能力。
+
+Goal: establish a reliable processed-market-data boundary before building stock-research capabilities on top of it.
+
+### Phase 3A：Processed Market Data Pipeline
+
+- datetime、OHLCV dtype、列顺序、时间顺序和 index 标准化
+- raw 与 processed 存储分层
+- 重复 timestamp 明确报错，不静默删除
+- 离线测试覆盖 processing、validation 和 processed CSV round-trip
+
+完成标准：可以从 raw DataFrame 生成并重载具有稳定 schema 的 processed CSV。当前已实现。
+
+Completion: a raw DataFrame can be transformed into and reloaded from a processed CSV with a stable schema. This subphase is implemented.
+
+### Phase 3B：Stock Research Foundation
 
 主要能力：
 
-- 缺失值、重复值和异常值处理
-- 交易日与价格字段一致性检查
 - 收益率及基础统计指标
 - 可复用的股票研究流程
 
 前置依赖：Phase 2。
 
-完成标准：清洗规则有测试支撑，并能产出可用于分析和回测的数据。
+完成标准：研究计算有测试支撑，并能在 processed schema 上产生可复现结果。
+
+Completion: research calculations are tested and reproducible on the processed schema.
 
 ## Phase 4：期权数据
 

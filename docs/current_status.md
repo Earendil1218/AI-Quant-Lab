@@ -1,78 +1,93 @@
-# 当前项目状态
+# 当前项目状态 / Current Project Status
 
-最后更新：2026-08-15
+最后更新 / Last updated: 2026-08-17
 
-## 当前里程碑
+## 当前里程碑 / Current Milestone
 
-- 版本：AI-Quant-Lab v0.3
-- Roadmap 阶段：Phase 2 — 历史数据存储与更新
-- 状态：已完成，等待确认并开始 Phase 3
+### 中文
 
-## Completed
+- 版本：AI Quant Lab v0.4
+- Roadmap：Phase 3A — Processed Market Data Pipeline
+- 状态：实现完成，等待最终离线验证和人工在线验证
 
-- 建立集中配置模块，支持环境变量和开发默认值
-- 将 IBKR TWS 只读连接独立为 broker 连接模块
-- 将股票合约、历史数据请求和 DataFrame 转换独立为市场数据模块
-- 建立仅负责流程编排的 `main.py`
-- 建立 `data/raw/` 和 `data/processed/` 目录骨架，尚未自动保存行情
-- 建立不依赖真实 TWS 的基础测试
-- 建立最小依赖清单，并完善 README 与 Git 忽略规则
-- 移除已被正式模块替代的测试脚本
-- 使用 `pathlib.Path` 建立可移植的项目和数据目录配置
-- 建立规范的市场数据文件命名，当前支持 `NVDA_1d.csv`
-- 建立独立 CSV 保存和读取模块，读取时恢复日期类型
-- 建立独立数据质量验证模块，覆盖结构、日期、价格和 OHLC 规则
-- 将主流程扩展为获取、验证、保存、重载和再次验证
-- 引入 pytest，并使用临时目录测试 CSV round-trip
+### English
 
-## Verified
+- Version: AI Quant Lab v0.4
+- Roadmap: Phase 3A — Processed Market Data Pipeline
+- Status: implementation complete, pending final offline verification and manual online verification
 
-### 离线验证
+## 已完成 / Completed
 
-- 44 项 pytest 测试全部通过
-- 配置路径、核心函数、历史请求参数和 DataFrame 转换已验证
-- CSV 文件命名、父目录创建、保存、读取、日期恢复和缺失文件异常已验证
-- 空数据、缺列、重复或乱序日期、无效日期、价格缺失、非数值价格和错误 OHLC 已验证
-- 测试使用内存假对象和 pytest 临时目录，不连接真实 TWS，也不污染 `data/raw/`
-- 未发现订单提交、修改、撤销或期权行权逻辑
+### 中文
 
-### IBKR Paper Trading 在线验证
+- 保留 IBKR TWS Paper Trading `readonly=True` 历史数据链路。
+- 新增独立 `data.processing` 模块，标准化 schema、datetime、OHLCV dtype、时间顺序和 index。
+- processed 数据固定为 `date, open, high, low, close, volume`。
+- 重复时间戳明确报错，不静默保留 first 或 last。
+- validation 增加 volume、有限数值、负价格和负成交量规则。
+- 正式启用 `data/processed/SYMBOL_INTERVAL.csv`。
+- `main.py` 形成 raw validation、raw storage、processing、processed validation、processed storage 和 reload verification 的完整流程。
+- README 建立中英双语开源入口并增加 Project Origin。
+- 建立渐进式双语文档、docstring 和重要注释规范。
 
-2026-08-15 在 VS Code Terminal 中人工执行：
+### English
 
-```powershell
-python -u main.py
-```
+- Preserved the read-only IBKR TWS Paper Trading historical-data boundary.
+- Added `data.processing` for schema, datetime, OHLCV dtype, chronological order, and index normalization.
+- Defined the processed schema as `date, open, high, low, close, volume`.
+- Made duplicate timestamps an explicit error instead of silently keeping the first or last row.
+- Extended validation to cover volume, finite values, negative prices, and negative volume.
+- Activated `data/processed/SYMBOL_INTERVAL.csv` as the processed-data layer.
+- Extended `main.py` across raw validation and storage, processing, processed validation and storage, and reload verification.
+- Established a bilingual README entry point with a Project Origin section.
+- Established progressive bilingual conventions for documentation, docstrings, and important comments.
 
-结果：
+## 已验证 / Verified
 
-- 成功连接 IBKR TWS Paper Trading
-- 成功获取并验证 NVDA 一年日线历史数据，共 251 条
-- 日期范围：2025-08-15 至 2026-08-14
-- 成功保存至 `data/raw/NVDA_1d.csv`
-- 从 CSV 重新读取后仍为 251 条，日期范围一致
-- 重载数据再次通过质量验证
-- 成功输出最近 5 条数据
-- 程序正常断开 TWS 连接
-- 真实 CSV 已确认被 Git 忽略
+### 中文
 
-## In Progress
+- 65 项 pytest 离线测试全部通过，无失败或 warning。
+- processing、validation、raw/processed path 和 CSV round-trip 均由固定输入或 pytest 临时目录验证。
+- 测试不连接真实 TWS，不写入项目数据目录，也不调用订单接口。
+- Phase 2 曾由用户人工在线验证：成功获取、验证、保存并重载 251 条 NVDA 日线数据。
 
-暂无。下一阶段尚未开始，等待 Phase 3 方案确认。
+### English
 
-## Known Issues
+- All 65 offline pytest tests pass with no failures or warnings.
+- Processing, validation, raw/processed paths, and CSV round trips use deterministic inputs or pytest temporary directories.
+- Tests do not connect to TWS, write to project data directories, or invoke order APIs.
+- Phase 2 was previously verified manually online with 251 NVDA daily bars fetched, validated, saved, and reloaded.
 
-- Codex 自动执行环境中，在线运行曾分别在 30 秒和 45 秒达到工具超时；同一程序已由用户在 VS Code Terminal 中人工验证成功，因此当前判断为自动执行环境问题，而非代码功能失败。
-- 当前测试尚未覆盖连接失败、contract qualify 失败及其他 IBKR 异常返回。
-- 当前文件名映射只正式支持 `1 day → 1d`；新增分钟线或小时线前需显式扩展映射和测试。
-- 当前保存流程使用完整请求结果覆盖同名 CSV，尚未实现增量合并。
+## 已知限制 / Known Limitations
 
-## Next
+### 中文
 
-1. 设计原始数据到处理后数据的清洗边界。
-2. 实现重复记录、缺失值和字段类型的清洗策略。
-3. 为连接失败、contract qualify 失败和异常返回增加离线测试。
-4. 在明确更新规则后设计历史数据增量合并，避免无条件扩大存储复杂度。
-5. 建立可复用的股票基础研究数据集和统计流程。
+- Phase 3 完整在线管道尚未在用户的 TWS 会话中人工验证。
+- 当前仅正式支持 `1 day → 1d` 文件名映射。
+- CSV 保存仍是同名文件全量覆盖，尚未实现增量合并。
+- 日线 date 必须不含时区；分钟线和多时区策略尚未设计。
+- 尚未处理拆股、分红或 adjusted price。
+- 连接失败、contract qualify 失败和部分 IBKR 异常返回仍缺少离线测试。
 
-当前安全限制保持不变：仅使用 IBKR Paper Trading 和只读历史数据访问，不包含订单功能。
+### English
+
+- The complete Phase 3 online pipeline has not yet been manually verified in the user's TWS session.
+- Only the `1 day → 1d` filename mapping is formally supported.
+- CSV persistence still replaces the complete file; incremental merging is not implemented.
+- Daily dates must be timezone-naive; intraday and multi-timezone policies are not yet designed.
+- Splits, dividends, and adjusted prices are not handled.
+- Connection failures, contract qualification failures, and some IBKR error responses still lack offline tests.
+
+## 下一步 / Next
+
+1. 在 VS Code Terminal 中人工运行 `python -u main.py`，确认 raw 和 processed CSV 均正确生成。
+2. 在稳定 processed schema 上开始 Phase 3B 股票研究基础，包括收益率和基础统计，但不进入策略或回测。
+3. 在明确覆盖、重叠和来源优先级规则后单独设计增量更新。
+
+1. Run `python -u main.py` manually in the VS Code terminal and verify both raw and processed CSV output.
+2. Begin Phase 3B stock-research foundations on the stable processed schema without entering strategy or backtesting work.
+3. Design incremental updates separately after overlap and source-priority rules are explicit.
+
+当前安全限制保持不变：只允许只读市场数据访问，不包含订单或自动执行。
+
+The safety boundary is unchanged: only read-only market-data access is allowed, with no order or automated execution capability.

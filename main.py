@@ -14,7 +14,10 @@ from config.settings import (
     IBKR_CLIENT_ID,
     IBKR_HOST,
     IBKR_PORT,
+    PROCESSED_DATA_DIR,
+    RAW_DATA_DIR,
 )
+from data.processing import process_market_data
 from data.storage import build_market_data_path, load_market_data, save_market_data
 from data.validation import validate_market_data
 
@@ -27,7 +30,11 @@ def _date_bounds(history: pd.DataFrame) -> tuple[object, object]:
 
 
 def main() -> None:
-    """连接 TWS，获取默认标的的历史数据并输出测试结果。"""
+    """
+    运行默认标的的只读历史数据处理流程。
+
+    Run the read-only historical market data pipeline for the default symbol.
+    """
     ib: IB | None = None
 
     try:
@@ -48,21 +55,39 @@ def main() -> None:
         )
         validate_market_data(history)
 
-        output_path = build_market_data_path(DEFAULT_SYMBOL, DEFAULT_BAR_SIZE)
-        save_market_data(history, output_path)
+        raw_path = build_market_data_path(
+            DEFAULT_SYMBOL,
+            DEFAULT_BAR_SIZE,
+            directory=RAW_DATA_DIR,
+        )
+        save_market_data(history, raw_path)
 
-        loaded_history = load_market_data(output_path)
+        processed_history = process_market_data(history)
+        validate_market_data(processed_history)
+
+        processed_path = build_market_data_path(
+            DEFAULT_SYMBOL,
+            DEFAULT_BAR_SIZE,
+            directory=PROCESSED_DATA_DIR,
+        )
+        save_market_data(processed_history, processed_path)
+
+        loaded_history = load_market_data(processed_path)
         validate_market_data(loaded_history)
 
-        source_bounds = _date_bounds(history)
+        source_bounds = _date_bounds(processed_history)
         loaded_bounds = _date_bounds(loaded_history)
-        if len(loaded_history) != len(history) or loaded_bounds != source_bounds:
-            raise RuntimeError("CSV 重新读取后的行数或日期范围与原始数据不一致。")
+        if (
+            len(loaded_history) != len(processed_history)
+            or loaded_bounds != source_bounds
+        ):
+            raise RuntimeError("processed CSV 重载后的行数或日期范围不一致。")
 
-        print(f"\n已获取并验证 {DEFAULT_SYMBOL} 历史数据：{len(history)} 条")
+        print(f"\n已获取并验证 {DEFAULT_SYMBOL} 原始数据：{len(history)} 条")
         print(f"日期范围：{source_bounds[0]} 至 {source_bounds[1]}")
-        print(f"已保存至：{output_path}")
-        print(f"重新读取并验证成功：{len(loaded_history)} 条")
+        print(f"原始数据已保存至：{raw_path}")
+        print(f"处理后数据已保存至：{processed_path}")
+        print(f"处理后数据重载并验证成功：{len(loaded_history)} 条")
         print("\n最近 5 条：")
         print(loaded_history.tail().to_string(index=False))
     except Exception as exc:

@@ -214,3 +214,46 @@ Phase 2 使用 CSV 作为原始历史市场数据的首版本地存储格式，�
 - broker 仍只返回 DataFrame，不负责持久化
 - storage 模块负责 CSV 命名、保存和读取
 - CSV 是当前阶段选择，不永久排除未来使用 Parquet 或数据库；需求改变时应新增决策记录
+
+## 2026-08-17：Phase 3 建立确定性的 processed market data 边界
+
+### Decision
+
+新增独立 `data.processing` 模块，将原始行情标准化为固定的 `date, open, high, low, close, volume` schema，并将结果保存到 `data/processed/`。重复时间戳默认报错，不自动删除。
+
+Add an independent `data.processing` module that normalizes raw history into the fixed `date, open, high, low, close, volume` schema and persists it under `data/processed/`. Duplicate timestamps raise an error and are not removed automatically.
+
+### Context
+
+Phase 2 已能获取、验证和保存 IBKR 原始 CSV，但研究层仍会接触数据源特有字段、类型和索引。Phase 3 需要建立稳定且不依赖 broker 细节的数据输入边界。
+
+Phase 2 could fetch, validate, and persist raw IBKR CSV data, but research code would still be exposed to source-specific fields, dtypes, and indexes. Phase 3 requires a stable input boundary independent of broker details.
+
+### Reason
+
+- validation、processing 和 storage 具有不同的变化原因，应保持独立。
+- 稳定 schema 可以供未来 research、indicators、strategy 和 backtest 复用。
+- 无来源优先级时自动保留 first 或 last 可能掩盖行情冲突。
+- 纯 DataFrame processing 易于离线测试且无需新增依赖。
+
+- Validation, processing, and storage change for different reasons and remain separate.
+- A stable schema can support future research, indicators, strategy, and backtesting modules.
+- Keeping the first or last duplicate without source priority could conceal a market-data conflict.
+- Pure DataFrame processing is deterministic, offline-testable, and requires no new dependency.
+
+### Alternatives
+
+- 在 validation 中直接修改和清洗数据。
+- 在 storage load/save 时隐式标准化数据。
+- 自动 `drop_duplicates(keep="first")` 或 `keep="last"`。
+- 立即引入 schema framework、pipeline class 或数据库。
+
+### Impact
+
+- `process_market_data` 不原地修改输入，并输出固定列顺序、类型、时间顺序和 index。
+- raw 数据保留数据源形态，processed 数据成为后续研究层的标准输入。
+- 分钟线时区、多数据源 reconciliation、增量更新和 corporate actions 出现真实需求后，需要重新评估当前设计。
+
+- `process_market_data` does not mutate its input and returns stable column order, dtypes, chronological order, and index.
+- Raw data preserves the source representation; processed data becomes the standard research-layer input.
+- Intraday timezone handling, multi-source reconciliation, incremental updates, and corporate actions will require reassessment when those needs become real.

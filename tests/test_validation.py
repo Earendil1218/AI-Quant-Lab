@@ -95,6 +95,34 @@ def test_rejects_non_numeric_price(price_column) -> None:
         validate_market_data(frame)
 
 
+@pytest.mark.parametrize("invalid_volume", [None, "invalid"])
+def test_rejects_missing_or_non_numeric_volume(invalid_volume) -> None:
+    frame = valid_history()
+    frame["volume"] = frame["volume"].astype(object)
+    frame.loc[0, "volume"] = invalid_volume
+
+    with pytest.raises(ValueError, match="OHLCV"):
+        validate_market_data(frame)
+
+
+@pytest.mark.parametrize(
+    ("column", "value", "message"),
+    [
+        ("open", float("inf"), "有限数值"),
+        ("volume", float("-inf"), "有限数值"),
+        ("open", -1.0, "不得为负值"),
+        ("volume", -1.0, "不得为负值"),
+    ],
+)
+def test_rejects_infinite_or_negative_ohlcv(column, value, message) -> None:
+    frame = valid_history()
+    frame[column] = frame[column].astype("float64")
+    frame.loc[0, column] = value
+
+    with pytest.raises(ValueError, match=message):
+        validate_market_data(frame)
+
+
 @pytest.mark.parametrize(
     ("column", "value"),
     [

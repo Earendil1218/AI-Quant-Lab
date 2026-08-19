@@ -108,6 +108,10 @@ Completion: a raw DataFrame can be transformed into and reloaded from a processe
 
 Completion: research calculations are tested and reproducible on the processed schema.
 
+状态：已实现。当前包括 simple return、log return、复利累计收益、基础描述统计、几何年化收益和日线年化波动率；策略、回测和 performance analytics 仍属于后续阶段。
+
+Status: implemented. The current scope includes simple returns, log returns, compounded cumulative returns, basic descriptive statistics, geometric annualized return, and daily annualized volatility. Strategy, backtesting, and performance analytics remain future phases.
+
 ## Phase 4：期权数据
 
 目标：建立期权合约与期权市场数据的获取和标准化能力。

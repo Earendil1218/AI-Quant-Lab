@@ -1,3 +1,4 @@
 ib-insync
+numpy
 pandas
 pytest

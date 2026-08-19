@@ -257,3 +257,42 @@ Phase 2 could fetch, validate, and persist raw IBKR CSV data, but research code 
 - `process_market_data` does not mutate its input and returns stable column order, dtypes, chronological order, and index.
 - Raw data preserves the source representation; processed data becomes the standard research-layer input.
 - Intraday timezone handling, multi-source reconciliation, incremental updates, and corporate actions will require reassessment when those needs become real.
+
+## 2026-08-19：Research 与 Data 正式分层
+
+### Decision
+
+新增独立 `research` package。`data` 层继续定义市场数据应具有的结构，`research` 层只定义从标准数据计算什么；研究函数不连接 broker、不读取固定路径，也不负责持久化。
+
+Add an independent `research` package. The `data` layer continues to define what market data should look like, while `research` defines only what is calculated from normalized data. Research functions do not connect to brokers, load fixed paths, or persist results.
+
+### Context
+
+Phase 3A 已建立稳定 processed OHLCV contract。收益率和统计属于派生研究指标；将其写入 processing 会混合数据标准化与金融计算，并让未来 indicator、strategy 和 backtest 难以复用清晰边界。
+
+Phase 3A established a stable processed OHLCV contract. Returns and statistics are derived research metrics. Placing them in processing would mix normalization with financial calculation and weaken reuse by future indicators, strategies, and backtests.
+
+### Reason
+
+- processing 与 research 有不同的变化原因。
+- 纯 DataFrame/Series API 可确定性离线测试。
+- 研究结果可以被 notebook、strategy、backtest、portfolio 和 risk 层复用。
+- 当前需求不需要 research engine、pipeline framework 或数据访问抽象。
+
+- Processing and research change for different reasons.
+- Pure DataFrame/Series APIs are deterministic and offline-testable.
+- Research results can be reused by notebooks, strategy, backtest, portfolio, and risk layers.
+- The current scope does not require a research engine, pipeline framework, or data-access abstraction.
+
+### Alternatives
+
+- 将收益计算加入 `data.processing`。
+- 让 research API 自行读取 processed CSV。
+- 提前建立通用 research pipeline 或 class hierarchy。
+
+### Impact
+
+- `research.returns` 提供 simple、log 和 cumulative return。
+- `research.statistics` 提供 typed summary 和显式 annualization 假设。
+- 当前 close 未确认经过 corporate-action adjustment，因此输出定义为 price return，而不是 total shareholder return。
+- performance metrics、策略和回测继续保留在后续独立层。

@@ -1,20 +1,20 @@
 # 当前项目状态 / Current Project Status
 
-最后更新 / Last updated: 2026-08-17
+最后更新 / Last updated: 2026-08-19
 
 ## 当前里程碑 / Current Milestone
 
 ### 中文
 
-- 版本：AI Quant Lab v0.4
-- Roadmap：Phase 3A — Processed Market Data Pipeline
-- 状态：实现完成，等待最终离线验证和人工在线验证
+- 版本：AI Quant Lab v0.5
+- Roadmap：Phase 3B — Stock Research Foundation
+- 状态：实现完成，等待最终验收
 
 ### English
 
-- Version: AI Quant Lab v0.4
-- Roadmap: Phase 3A — Processed Market Data Pipeline
-- Status: implementation complete, pending final offline verification and manual online verification
+- Version: AI Quant Lab v0.5
+- Roadmap: Phase 3B — Stock Research Foundation
+- Status: implementation complete, pending final acceptance
 
 ## 已完成 / Completed
 
@@ -46,23 +46,42 @@
 
 ### 中文
 
-- 65 项 pytest 离线测试全部通过，无失败或 warning。
+- 90 项 pytest 离线测试全部通过，无失败或 warning。
 - processing、validation、raw/processed path 和 CSV round-trip 均由固定输入或 pytest 临时目录验证。
 - 测试不连接真实 TWS，不写入项目数据目录，也不调用订单接口。
 - Phase 2 曾由用户人工在线验证：成功获取、验证、保存并重载 251 条 NVDA 日线数据。
+- Phase 3A 于 2026-08-19 由用户人工在线验证：251 条 NVDA 日线完成 raw 保存、processed 保存、重载验证并正常断开 TWS。
 
 ### English
 
-- All 65 offline pytest tests pass with no failures or warnings.
+- All 90 offline pytest tests pass with no failures or warnings.
 - Processing, validation, raw/processed paths, and CSV round trips use deterministic inputs or pytest temporary directories.
 - Tests do not connect to TWS, write to project data directories, or invoke order APIs.
 - Phase 2 was previously verified manually online with 251 NVDA daily bars fetched, validated, saved, and reloaded.
+- Phase 3A was manually verified online on 2026-08-19: 251 NVDA daily bars completed raw storage, processed storage, reload validation, and a clean TWS disconnect.
+
+## Phase 3B / Stock Research Foundation
+
+### 中文
+
+- 新增独立 `research` package，与 processing、storage 和 broker 解耦。
+- 支持 simple return、log return 和复利 cumulative return，并保留首项 NaN。
+- 支持观察数、均值、样本标准差、最小值、最大值、累计收益、几何年化收益和年化波动率。
+- 日线默认使用 `TRADING_DAYS_PER_YEAR = 252`；这是可覆盖的市场惯例假设。
+- 所有 public API 使用中英双语 docstring，计算可完全离线运行。
+
+### English
+
+- Added an independent `research` package decoupled from processing, storage, and broker access.
+- Added simple, log, and compounded cumulative returns while preserving the leading NaN.
+- Added count, mean, sample standard deviation, minimum, maximum, cumulative return, geometric annualized return, and annualized volatility.
+- Daily calculations default to `TRADING_DAYS_PER_YEAR = 252`, an overridable market-convention assumption.
+- All public APIs have bilingual docstrings and run fully offline.
 
 ## 已知限制 / Known Limitations
 
 ### 中文
 
-- Phase 3 完整在线管道尚未在用户的 TWS 会话中人工验证。
 - 当前仅正式支持 `1 day → 1d` 文件名映射。
 - CSV 保存仍是同名文件全量覆盖，尚未实现增量合并。
 - 日线 date 必须不含时区；分钟线和多时区策略尚未设计。
@@ -71,7 +90,6 @@
 
 ### English
 
-- The complete Phase 3 online pipeline has not yet been manually verified in the user's TWS session.
 - Only the `1 day → 1d` filename mapping is formally supported.
 - CSV persistence still replaces the complete file; incremental merging is not implemented.
 - Daily dates must be timezone-naive; intraday and multi-timezone policies are not yet designed.
@@ -80,12 +98,12 @@
 
 ## 下一步 / Next
 
-1. 在 VS Code Terminal 中人工运行 `python -u main.py`，确认 raw 和 processed CSV 均正确生成。
-2. 在稳定 processed schema 上开始 Phase 3B 股票研究基础，包括收益率和基础统计，但不进入策略或回测。
+1. 人工审阅并验收 Phase 3B research API、数学定义和文档。
+2. 验收后单独执行 Git commit、push 和 PR 工作流。
 3. 在明确覆盖、重叠和来源优先级规则后单独设计增量更新。
 
-1. Run `python -u main.py` manually in the VS Code terminal and verify both raw and processed CSV output.
-2. Begin Phase 3B stock-research foundations on the stable processed schema without entering strategy or backtesting work.
+1. Manually review and accept the Phase 3B research APIs, financial definitions, and documentation.
+2. Run the Git commit, push, and PR workflow separately after acceptance.
 3. Design incremental updates separately after overlap and source-priority rules are explicit.
 
 当前安全限制保持不变：只允许只读市场数据访问，不包含订单或自动执行。

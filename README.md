@@ -144,6 +144,27 @@ python -m pytest -p no:cacheprovider -v
 
 Tests use in-memory objects and pytest temporary directories. They do not connect to a real TWS session or write into the project data directories.
 
+## 股票研究基础 / Stock Research Foundation
+
+### 中文
+
+Phase 3B 在稳定的 processed OHLCV schema 上提供独立 `research` 层。它可以计算 close 的简单收益率、对数收益率、复利累计收益，以及基础描述统计。研究函数只接收内存中的 DataFrame 或 Series，不连接 IBKR、不读取固定路径，也不保存文件。
+
+```python
+from research import calculate_simple_returns, summarize_returns
+
+simple_returns = calculate_simple_returns(processed_history)
+summary = summarize_returns(simple_returns)
+```
+
+日线年化默认采用每年 252 个交易期的市场惯例。年化波动率为日收益率样本标准差乘以 `sqrt(252)`；年化收益率采用累计增长的几何年化定义。当前计算基于可用 close 序列；项目尚未处理拆股、分红或 adjusted prices，因此结果是 price return，不一定是 total shareholder return。
+
+### English
+
+Phase 3B adds an independent `research` layer on top of the stable processed OHLCV schema. It calculates simple close returns, log returns, compounded cumulative returns, and basic descriptive statistics. Research functions consume in-memory DataFrames or Series only; they do not connect to IBKR, load fixed paths, or save files.
+
+Daily annualization defaults to the market convention of 252 trading periods per year. Annualized volatility is the sample standard deviation of daily returns multiplied by `sqrt(252)`; annualized return uses geometric annualization of compounded growth. Calculations use the available close series. Because splits, dividends, and adjusted prices are not yet handled, results are price returns and are not necessarily total shareholder returns.
+
 ## 安全边界 / Safety Boundary
 
 ### 中文

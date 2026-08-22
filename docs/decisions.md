@@ -296,3 +296,48 @@ Phase 3A established a stable processed OHLCV contract. Returns and statistics a
 - `research.statistics` 提供 typed summary 和显式 annualization 假设。
 - 当前 close 未确认经过 corporate-action adjustment，因此输出定义为 price return，而不是 total shareholder return。
 - performance metrics、策略和回测继续保留在后续独立层。
+
+## 2026-08-22：日期化研究采用精确交集与统一共同样本
+
+### Decision
+
+日线 Research API 使用无时区、唯一且升序的 `DatetimeIndex`。多资产与 benchmark 比较采用真实收益日期的精确交集，不 forward-fill、不 backward-fill，也不把缺失收益视为零。相关矩阵中的所有资产统一使用同一个共同日期样本，不使用 pairwise available observations。
+
+Daily research APIs use a timezone-naive, unique, ascending `DatetimeIndex`. Multi-asset and benchmark comparisons use the exact intersection of observed return dates without forward filling, backward filling, or treating missing returns as zero. Every entry in a correlation matrix uses one shared common-date sample rather than pairwise available observations.
+
+### Context
+
+Phase 3C 引入 benchmark、active return、tracking error 和多资产 correlation。若不同资产使用不同观察日期或通过填充制造收益，比较结果将不再具有统一的样本含义。
+
+Phase 3C introduces benchmarks, active returns, tracking error, and multi-asset correlation. Comparisons lose a consistent sample interpretation if assets use different observation dates or if returns are manufactured by filling gaps.
+
+### Reason
+
+- 缺失收益不等于零收益。
+- active return 必须对应同一日期的资产和 benchmark 收益。
+- correlation matrix 使用统一样本后，各 pair 的结果更可比较。
+- timezone-naive 日线契约与当前 processed data 一致；分钟线、多市场和交易所 calendar 需要未来独立设计。
+
+- A missing return is not a zero return.
+- Active returns require asset and benchmark observations from the same date.
+- A shared correlation sample makes results across pairs more comparable.
+- The timezone-naive daily contract matches current processed data; intraday, multi-market, and exchange-calendar semantics require a separate future design.
+
+### Alternatives
+
+- 对缺失日期 forward-fill、backward-fill 或补零。
+- 允许 pandas 在未经统一对齐的 Series 上隐式比较。
+- correlation 对每个资产 pair 使用不同的可用日期。
+- 在尚未支持分钟线前引入通用时区和 calendar framework。
+
+### Impact
+
+- leading NaN 只表示第一日没有 previous price，对齐前移除；内部或末尾 NaN 明确拒绝。
+- benchmark 累计曲线从同一共同起点开始。
+- Research 继续只处理内存 DataFrame/Series，不连接 broker 或执行文件 I/O。
+- Phase 3C 后暂停无边界增加研究指标；Signal/Strategy 与 Options 两条后续方向需重新评审。
+
+- A leading NaN only marks the absence of a previous price on the first date and is removed before alignment; internal or trailing NaN is rejected.
+- Benchmark cumulative curves start from the same common observation.
+- Research continues to operate only on in-memory DataFrames/Series without broker access or file I/O.
+- After Phase 3C, unbounded metric expansion pauses; Signal/Strategy and Options remain alternative directions for the next review.

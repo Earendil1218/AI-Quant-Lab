@@ -95,6 +95,8 @@ Goal: establish a reliable processed-market-data boundary before building stock-
 
 Completion: a raw DataFrame can be transformed into and reloaded from a processed CSV with a stable schema. This subphase is implemented.
 
+状态 / Status：已完成 / Completed.
+
 ### Phase 3B：Stock Research Foundation
 
 主要能力：
@@ -111,6 +113,48 @@ Completion: research calculations are tested and reproducible on the processed s
 状态：已实现。当前包括 simple return、log return、复利累计收益、基础描述统计、几何年化收益和日线年化波动率；策略、回测和 performance analytics 仍属于后续阶段。
 
 Status: implemented. The current scope includes simple returns, log returns, compounded cumulative returns, basic descriptive statistics, geometric annualized return, and daily annualized volatility. Strategy, backtesting, and performance analytics remain future phases.
+
+状态 / Status：已完成并合并 / Completed and merged.
+
+### Phase 3C：Performance and Comparative Research Foundation
+
+主要能力：
+
+- 日期化 simple-return Series 与多资产精确日期交集对齐
+- wealth index、drawdown、maximum drawdown 与 peak/trough/recovery 日期
+- 完整窗口 rolling compounded return 与 rolling annualized volatility
+- benchmark 累计表现比较、active return 与 annualized tracking error
+- 使用统一共同日期样本的 Pearson correlation matrix
+
+Core capabilities:
+
+- Date-aware simple-return Series and exact-date multi-asset alignment
+- Wealth index, drawdown, maximum drawdown, and peak/trough/recovery dates
+- Complete-window rolling compounded return and rolling annualized volatility
+- Benchmark cumulative comparison, active returns, and annualized tracking error
+- Pearson correlation matrices over one shared common-date sample
+
+完成标准：公共 API 定义明确，金融语义由确定性离线测试锁定，不连接 broker 或执行文件 I/O。
+
+Completion: public APIs have explicit definitions, deterministic offline tests lock their financial semantics, and no broker connection or file I/O occurs.
+
+状态 / Status：已完成 / Completed.
+
+### 下一阶段架构评审 / Next-phase Architecture Review
+
+Phase 3C 完成后暂不继续无限扩展研究指标。下一阶段需在以下两个方向间重新评估优先级：
+
+- A. 股票量化工作流：Signal / Strategy Foundation
+- B. 期权纵向能力：Options Market Data，随后是 Pricing / IV / Greeks
+
+After Phase 3C, the research metric surface should not expand indefinitely. The next architecture review must choose priorities between:
+
+- A. Stock quantitative workflow: Signal / Strategy Foundation
+- B. Options vertical capability: Options Market Data followed by Pricing / IV / Greeks
+
+本路线图记录两条方向，不在 Phase 3C 中替用户作出选择。
+
+This roadmap records both directions without selecting one during Phase 3C.
 
 ## Phase 4：期权数据
 

@@ -144,26 +144,42 @@ python -m pytest -p no:cacheprovider -v
 
 Tests use in-memory objects and pytest temporary directories. They do not connect to a real TWS session or write into the project data directories.
 
-## 股票研究基础 / Stock Research Foundation
+## 股票研究层 / Stock Research Layer
 
 ### 中文
 
-Phase 3B 在稳定的 processed OHLCV schema 上提供独立 `research` 层。它可以计算 close 的简单收益率、对数收益率、复利累计收益，以及基础描述统计。研究函数只接收内存中的 DataFrame 或 Series，不连接 IBKR、不读取固定路径，也不保存文件。
+Phase 3B 在稳定的 processed OHLCV schema 上建立了独立 `research` 层；Phase 3C 进一步加入日期化收益、多资产对齐、回撤、滚动指标、基准比较和相关性分析。研究函数只接收内存中的 DataFrame 或 Series，不连接 IBKR、不读取固定路径，也不保存文件。
 
 ```python
-from research import calculate_simple_returns, summarize_returns
+from research import (
+    align_return_series,
+    calculate_dated_simple_returns,
+    calculate_drawdowns,
+    calculate_rolling_annualized_volatility,
+    compare_cumulative_performance,
+)
 
-simple_returns = calculate_simple_returns(processed_history)
-summary = summarize_returns(simple_returns)
+asset_returns = calculate_dated_simple_returns(processed_history, "NVDA")
+benchmark_returns = calculate_dated_simple_returns(benchmark_history, "SPY")
+aligned = align_return_series({"NVDA": asset_returns, "SPY": benchmark_returns})
+drawdowns = calculate_drawdowns(asset_returns)
+rolling_volatility = calculate_rolling_annualized_volatility(asset_returns, 20)
+cumulative_comparison = compare_cumulative_performance(
+    asset_returns, benchmark_returns, "NVDA", "SPY"
+)
 ```
 
-日线年化默认采用每年 252 个交易期的市场惯例。年化波动率为日收益率样本标准差乘以 `sqrt(252)`；年化收益率采用累计增长的几何年化定义。当前计算基于可用 close 序列；项目尚未处理拆股、分红或 adjusted prices，因此结果是 price return，不一定是 total shareholder return。
+核心定义：simple return 为相邻 close 的百分比变化；累计收益和滚动收益使用 `prod(1 + r) - 1` 复利；年化波动率和 rolling annualized volatility 使用样本标准差 `ddof=1` 乘以 `sqrt(periods_per_year)`；wealth index 为初始财富乘以累计增长因子；drawdown 为 wealth 相对 running peak 的比例下降，maximum drawdown 为该序列最小值；active return 为 asset return 减 benchmark return；tracking error 为 active return 样本标准差的年化值；correlation 使用全部资产共同日期样本上的 Pearson correlation。
+
+日期化研究当前要求无时区、唯一且升序的 `DatetimeIndex`。多资产与 benchmark 采用精确日期交集，不填充缺失收益，也不把缺失收益视为零。当前计算仍基于可用 raw close；项目尚未处理 adjusted close、拆股或分红，因此结果是 price return，不一定是 total return。
 
 ### English
 
-Phase 3B adds an independent `research` layer on top of the stable processed OHLCV schema. It calculates simple close returns, log returns, compounded cumulative returns, and basic descriptive statistics. Research functions consume in-memory DataFrames or Series only; they do not connect to IBKR, load fixed paths, or save files.
+Phase 3B established an independent `research` layer on the stable processed OHLCV schema. Phase 3C adds date-aware returns, multi-asset alignment, drawdowns, rolling metrics, benchmark comparison, and correlation. Research functions consume in-memory DataFrames or Series only; they do not connect to IBKR, load fixed paths, or save files.
 
-Daily annualization defaults to the market convention of 252 trading periods per year. Annualized volatility is the sample standard deviation of daily returns multiplied by `sqrt(252)`; annualized return uses geometric annualization of compounded growth. Calculations use the available close series. Because splits, dividends, and adjusted prices are not yet handled, results are price returns and are not necessarily total shareholder returns.
+Core definitions: simple return is the percentage change between adjacent closes; cumulative and rolling returns use `prod(1 + r) - 1`; annualized and rolling annualized volatility use sample standard deviation with `ddof=1` multiplied by `sqrt(periods_per_year)`; wealth index compounds growth from an initial value; drawdown measures wealth relative to its running peak and maximum drawdown is its minimum; active return is asset return minus benchmark return; tracking error is the annualized sample standard deviation of active returns; correlation is Pearson correlation over one common date sample shared by all assets.
+
+Date-aware research currently requires a timezone-naive, unique, ascending `DatetimeIndex`. Assets and benchmarks use their exact date intersection without filling missing returns or treating them as zero. Calculations still use the available raw close. Adjusted close, splits, and dividends are not handled, so results are price returns and not necessarily total returns. Strategy, backtesting, options, Greeks, and portfolio risk remain future capabilities.
 
 ## 安全边界 / Safety Boundary
 

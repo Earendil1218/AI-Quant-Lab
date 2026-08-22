@@ -44,13 +44,8 @@ def calculate_log_returns(frame: pd.DataFrame) -> pd.Series:
     return returns.astype("float64")
 
 
-def calculate_cumulative_returns(returns: pd.Series) -> pd.Series:
-    """
-    用复利计算简单收益率的累计序列，并保留可选的首行 NaN。
-
-    Compound a simple-return Series, preserving an optional leading NaN.
-    Missing values after the first observation are rejected rather than skipped.
-    """
+def _validate_simple_return_series(returns: pd.Series) -> pd.Series:
+    """Validate simple-return values while preserving an optional leading NaN."""
     if not isinstance(returns, pd.Series):
         raise TypeError("returns 必须是 pandas Series。returns must be a pandas Series.")
 
@@ -68,6 +63,35 @@ def calculate_cumulative_returns(returns: pd.Series) -> pd.Series:
         raise ValueError("returns 仅允许首项为 NaN。Only a leading NaN is allowed.")
     if (numeric.dropna() < -1).any():
         raise ValueError("简单收益率不得小于 -1。Simple returns cannot be below -1.")
+    return numeric
+
+
+def _validate_dated_simple_return_series(returns: pd.Series) -> pd.Series:
+    """Validate non-empty simple returns with unambiguous daily date semantics."""
+    numeric = _validate_simple_return_series(returns)
+    if numeric.empty:
+        raise ValueError("returns 不能为空。returns must not be empty.")
+    if not isinstance(numeric.index, pd.DatetimeIndex):
+        raise TypeError("returns 必须使用 DatetimeIndex。returns must use a DatetimeIndex.")
+    if numeric.index.tz is not None:
+        raise ValueError(
+            "returns 日期不得包含时区。returns dates must be timezone-naive."
+        )
+    if numeric.index.has_duplicates:
+        raise ValueError("returns 日期不得重复。returns dates must be unique.")
+    if not numeric.index.is_monotonic_increasing:
+        raise ValueError("returns 日期必须升序排列。returns dates must be ascending.")
+    return numeric
+
+
+def calculate_cumulative_returns(returns: pd.Series) -> pd.Series:
+    """
+    用复利计算简单收益率的累计序列，并保留可选的首行 NaN。
+
+    Compound a simple-return Series, preserving an optional leading NaN.
+    Missing values after the first observation are rejected rather than skipped.
+    """
+    numeric = _validate_simple_return_series(returns)
 
     cumulative = (1.0 + numeric).cumprod() - 1.0
     cumulative.name = "cumulative_return"

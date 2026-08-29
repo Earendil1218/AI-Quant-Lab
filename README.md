@@ -4,11 +4,11 @@
 
 ### 中文
 
-AI Quant Lab 是一个持续演进的量化研究项目，长期目标是建设具备真实工程质量的市场数据、研究、回测、期权、组合风险与执行平台。当前 Phase 3 已建立从 IBKR 原始历史行情到标准化 processed 数据、研究指标、信号和策略意图的确定性链路。
+AI Quant Lab 是一个持续演进的量化研究项目，长期目标是建设具备真实工程质量的市场数据、研究、回测、期权、组合风险与执行平台。当前 Phase 3 已建立从 IBKR 原始历史行情到标准化 processed 数据、研究指标、信号、策略意图和确定性模拟成交的分层链路。
 
 ### English
 
-AI Quant Lab is an evolving quantitative research project whose long-term goal is to become an engineering-focused platform for market data, research, backtesting, options, portfolio risk, and execution. Phase 3 now provides a deterministic path from raw IBKR history to processed data, research indicators, signals, and strategy intent.
+AI Quant Lab is an evolving quantitative research project whose long-term goal is to become an engineering-focused platform for market data, research, backtesting, options, portfolio risk, and execution. Phase 3 now provides a layered deterministic path from raw IBKR history to processed data, research indicators, signals, strategy intent, and simulated fills.
 
 ## 项目起源 / Project Origin
 
@@ -85,7 +85,9 @@ AI-Quant-Lab/
 ├── research/            # Pure returns, statistics, and indicators
 ├── pricing/             # Future options pricing and Greeks
 ├── strategies/          # Pure signals and target-position intent
-├── backtest/            # Future backtesting
+├── trading/             # Broker-neutral instruments, intents, orders, and fills
+├── portfolio/           # Sizing, target reconciliation, and fill accounting
+├── backtest/            # Deterministic daily simulation and analytics view
 └── risk/                # Future portfolio and risk controls
 ```
 
@@ -197,6 +199,28 @@ intents = strategy.generate_intents(processed_history)
 `fast MA > slow MA` maps to target position `1.0` (long); `fast MA <= slow MA` maps to `0.0` (flat). Before the complete slow window exists, signal state is explicitly `unavailable` and target position is `NaN`. Rolling windows use only current and earlier observations: there is no backward fill or future-data access.
 
 Signal describes an observed market condition. Strategy converts that state into desired exposure. It never submits orders, reads broker positions, manages cash, or assumes fills; future backtest, portfolio/risk, and execution layers consume the intent contract separately.
+
+## Trading Domain 与 Backtest / Trading Domain and Backtest
+
+Phase 3E converts Phase 3D strategy output into a broker-neutral trading flow:
+
+```text
+TargetExposureIntent
+  → FixedQuantitySizing
+  → TargetQuantity
+  → Position Reconciliation
+  → OrderRequest
+  → Next-Open Simulated Execution
+  → Fill
+  → PortfolioState
+  → End-of-Day PortfolioSnapshot
+```
+
+`target_position` is interpreted only as standardized target exposure: `1.0` means desired long state and `0.0` means desired flat state. It never directly means one share, account NAV allocation, notional, or a fixed dollar amount. The independent sizing policy converts exposure into quantity; the first implementation is deterministic `FixedQuantitySizing`.
+
+Daily lifecycle is explicit: after Day T closes, the completed bar produces an intent and pending order; at Day T+1 open, that pending order may fill; at Day T+1 close, the portfolio is marked and snapshotted before the next intent is generated. Same-close fills are prohibited.
+
+Domain accounting stores cash, fill prices, commissions, and equity as `Decimal`; research and OHLCV stay `float64`, while `BacktestResult.equity_curve()` provides a numeric pandas view. Orders are broker-neutral records only. This phase does not connect to the IBKR order API or perform Paper/Live Trading.
 
 ## 安全边界 / Safety Boundary
 

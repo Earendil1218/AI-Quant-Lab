@@ -154,6 +154,32 @@ Completion: public APIs have explicit definitions, deterministic offline tests l
 
 Completion: processed OHLCV produces deterministic in-memory signals and long/flat target positions; future-data changes cannot alter historical outputs; broker, storage, and execution remain outside this layer.
 
+状态 / Status：已完成并合并 / Completed and merged.
+
+### Phase 3E：Trading Domain and Backtest Foundation
+
+主要能力：
+
+- broker-neutral instrument、target intent、order、fill contracts
+- target exposure 与 target quantity 分离，第一版使用 fixed-quantity sizing
+- cash、position quantity、mark-to-market 与 end-of-day portfolio snapshots
+- planning decision 与 execution rejection 分层
+- T close decision → T+1 open simulated execution
+- deterministic fixed commission、basis-point slippage 与 numeric equity-curve view
+
+Core capabilities:
+
+- Broker-neutral instrument, target-intent, order, and fill contracts
+- Separate target exposure and target quantity with fixed-quantity sizing first
+- Cash, position quantity, mark-to-market, and end-of-day portfolio snapshots
+- Separate planning decisions and execution rejections
+- T-close decisions followed by T+1-open simulated execution
+- Deterministic fixed commission, basis-point slippage, and a numeric equity-curve view
+
+完成标准：single-equity daily long/flat strategy 可以从 Phase 3D intent 经 sizing、position reconciliation、broker-neutral order、simulated fill 和 accounting 产生确定性的 orders、fills、cash、position 与 equity curve；核心 trading domain 不依赖 pandas、IBKR 或 ib_insync。
+
+Completion: a single-equity daily long/flat strategy produces deterministic orders, fills, cash, positions, and an equity curve from Phase 3D intent through sizing, reconciliation, broker-neutral orders, simulated fills, and accounting. The core trading domain does not depend on pandas, IBKR, or ib_insync.
+
 状态 / Status：已实现，等待 feature branch 验收 / Implemented, pending feature-branch acceptance.
 
 ## Phase 4：期权数据

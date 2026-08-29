@@ -6,15 +6,15 @@
 
 ### 中文
 
-- 版本：AI Quant Lab v0.7
-- Roadmap：Phase 3D — Signal and Strategy Foundation
-- 状态：Phase 3A–3D 已实现；Phase 3D 正在 feature branch 验收
+- 版本：AI Quant Lab v0.8
+- Roadmap：Phase 3E — Trading Domain and Backtest Foundation
+- 状态：Phase 3A–3D 已合并；Phase 3E 正在 feature branch 验收
 
 ### English
 
-- Version: AI Quant Lab v0.7
-- Roadmap: Phase 3D — Signal and Strategy Foundation
-- Status: Phases 3A–3D are implemented; Phase 3D is under feature-branch acceptance
+- Version: AI Quant Lab v0.8
+- Roadmap: Phase 3E — Trading Domain and Backtest Foundation
+- Status: Phases 3A–3D are merged; Phase 3E is under feature-branch acceptance
 
 ## 已完成 / Completed
 
@@ -32,6 +32,7 @@
 - Phase 3B 已合并到 `main`，提供 simple/log/cumulative return 和基础统计。
 - Phase 3C 提供日期化收益、多资产精确日期对齐、财富与回撤、完整窗口滚动收益和波动率、benchmark 比较、active return、tracking error 与统一样本 Pearson correlation。
 - Phase 3D 提供 trailing moving average、显式 signal state、Strategy abstraction 和 long/flat target-position intent。
+- Phase 3E 提供 broker-neutral trading domain、fixed-quantity sizing、portfolio accounting 和 next-open deterministic backtest vertical slice。
 
 ### English
 
@@ -47,12 +48,13 @@
 - Phase 3B is merged into `main` and provides simple, log, and cumulative returns plus basic statistics.
 - Phase 3C provides date-aware returns, exact-date multi-asset alignment, wealth and drawdown analysis, complete-window rolling returns and volatility, benchmark comparison, active returns, tracking error, and shared-sample Pearson correlation.
 - Phase 3D provides trailing moving averages, explicit signal states, a Strategy abstraction, and long/flat target-position intent.
+- Phase 3E provides a broker-neutral trading domain, fixed-quantity sizing, portfolio accounting, and a deterministic next-open backtest vertical slice.
 
 ## 已验证 / Verified
 
 ### 中文
 
-- 213 项 pytest 离线测试全部通过，无失败或 warning。
+- 268 项 pytest 离线测试全部通过，无失败或 warning。
 - processing、validation、raw/processed path 和 CSV round-trip 均由固定输入或 pytest 临时目录验证。
 - 测试不连接真实 TWS，不写入项目数据目录，也不调用订单接口。
 - Phase 2 曾由用户人工在线验证：成功获取、验证、保存并重载 251 条 NVDA 日线数据。
@@ -60,7 +62,7 @@
 
 ### English
 
-- All 213 offline pytest tests pass with no failures or warnings.
+- All 268 offline pytest tests pass with no failures or warnings.
 - Processing, validation, raw/processed paths, and CSV round trips use deterministic inputs or pytest temporary directories.
 - Tests do not connect to TWS, write to project data directories, or invoke order APIs.
 - Phase 2 was previously verified manually online with 251 NVDA daily bars fetched, validated, saved, and reloaded.
@@ -102,6 +104,24 @@
 - The MA crossover is a frozen-configuration, in-memory reference implementation with no broker or execution access.
 - Future-mutation and future-append tests lock the no-look-ahead policy.
 
+## Phase 3E / Trading Domain and Backtest Foundation
+
+- `target_position` 在 trading boundary 中解释为 standardized target exposure；它不代表 shares、NAV、notional 或固定金额。
+- `FixedQuantitySizing` 独立地将 long/flat exposure 转换为 target quantity，再由 portfolio reconciliation 生成 order plan。
+- `trading` 提供 broker-neutral instrument、intent、order、fill 和 rejection records，不依赖 pandas 或 ib_insync。
+- `PortfolioState` 只通过 Fill 更新 cash 与 position quantity；本阶段不引入未定义的 average-cost accounting。
+- planning decision 与 execution rejection 使用不同 enum；当前执行拒绝包括 insufficient cash 和 no next bar。
+- daily lifecycle 固定为 OPEN 执行 pending order，CLOSE mark/snapshot/observe/plan；禁止 same-close fill。
+- accounting boundary 使用 Decimal；research/OHLCV 保持 float64，equity curve 明确提供 float64 pandas view。
+
+- At the trading boundary, `target_position` means standardized target exposure; it is not shares, NAV, notional, or a fixed currency amount.
+- `FixedQuantitySizing` independently converts long/flat exposure into target quantity before portfolio reconciliation creates an order plan.
+- `trading` provides broker-neutral instrument, intent, order, fill, and rejection records without pandas or ib_insync dependencies.
+- `PortfolioState` updates cash and position quantity only through Fill; undefined average-cost accounting is intentionally absent.
+- Planning decisions and execution rejections use separate enums; current execution rejections cover insufficient cash and no next bar.
+- The daily lifecycle executes pending orders at OPEN, then marks/snapshots/observes/plans at CLOSE; same-close fills are prohibited.
+- Accounting uses Decimal while research/OHLCV remains float64; the equity curve is an explicit float64 pandas view.
+
 ## 已知限制 / Known Limitations
 
 ### 中文
@@ -111,7 +131,7 @@
 - 日线 date 必须不含时区；分钟线和多时区策略尚未设计。
 - 尚未处理拆股、分红或 adjusted price。
 - 尚未设计多交易所 calendar policy。
-- 当前仅有单资产 long/flat MA crossover reference strategy；尚未实现 Backtest、Options、Greeks 或 Portfolio Risk。
+- 当前 backtest 仅支持 single-equity、daily、long/flat、fixed quantity、next-open execution；尚未实现 Options、Greeks 或 Portfolio Risk。
 - 不支持自动化 Paper Trading 或 Live Trading。
 - 连接失败、contract qualify 失败和部分 IBKR 异常返回仍缺少离线测试。
 
@@ -122,20 +142,20 @@
 - Daily dates must be timezone-naive; intraday and multi-timezone policies are not yet designed.
 - Splits, dividends, and adjusted prices are not handled.
 - No multi-exchange calendar policy has been designed.
-- Strategy scope is limited to a single-asset long/flat MA crossover reference; backtesting, options, Greeks, and portfolio risk are not implemented.
+- Backtesting is limited to single-equity, daily, long/flat, fixed-quantity, next-open execution; options, Greeks, and portfolio risk are not implemented.
 - Automated paper trading and live trading are not supported.
 - Connection failures, contract qualification failures, and some IBKR error responses still lack offline tests.
 
 ## 下一步 / Next
 
-1. 完成 Phase 3D feature branch 的人工验收和 Git commit/push/PR 工作流。
-2. 为未来 Backtest Engine 设计消费 target-position intent 的时间与执行语义。
+1. 完成 Phase 3E feature branch 的人工验收和 Git commit/push/PR 工作流。
+2. 评审下一阶段 Portfolio Risk 或 broker execution abstraction 的优先级，不直接授权 Paper order submission。
 3. Options、增量更新、分钟线时区和 corporate actions 继续作为独立能力设计。
 
-1. Complete Phase 3D feature-branch acceptance and its Git commit/push/PR workflow.
-2. Design how a future backtest engine consumes target-position intent, including timing and execution semantics.
+1. Complete Phase 3E feature-branch acceptance and its Git commit/push/PR workflow.
+2. Review whether Portfolio Risk or a broker execution abstraction should come next; this does not authorize Paper order submission.
 3. Keep options, incremental updates, intraday timezone semantics, and corporate actions as separate capabilities.
 
-当前安全限制保持不变：只允许只读市场数据访问，不包含订单或自动执行。
+当前安全限制保持不变：broker 只允许只读市场数据访问；broker-neutral 模拟订单不会提交到 IBKR，不包含自动执行。
 
-The safety boundary is unchanged: only read-only market-data access is allowed, with no order or automated execution capability.
+The safety boundary is unchanged: broker access remains read-only; broker-neutral simulated orders are never submitted to IBKR and no automated execution is included.

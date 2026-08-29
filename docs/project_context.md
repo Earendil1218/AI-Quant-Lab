@@ -31,25 +31,25 @@ AI Quant Lab aims to become a clearly layered, verifiable, extensible quantitati
 项目按职责分层：
 
 ```text
-config
-  ↓
-broker
-  ↓
-data
-  ↓
-pricing / strategies
-  ↓
-backtest
-  ↓
-risk
+broker market data → data → research → signal → strategy
+                                             ↓
+                                      target exposure
+                                             ↓
+trading domain → sizing → portfolio planning → risk (future)
+                                             ↓
+                                    execution abstraction
+                                      ↙             ↘
+                              backtest simulation   broker adapter (future)
 ```
 
 - `config` 管理运行参数，不包含业务流程。
 - `broker` 隔离外部券商 API 连接和市场数据访问，不承担数据持久化或策略逻辑。
 - `data` 负责市场数据验证、标准化和持久化；raw 与 processed 数据具有明确边界。
 - `pricing` 负责定价模型、隐含波动率和 Greeks。
-- `strategies` 负责表达研究策略，不直接拥有券商连接。
-- `backtest` 负责基于历史数据验证策略。
+- `strategies` 只表达 signal 和 desired target exposure，不直接拥有券商、账户、现金或订单职责。
+- `trading` 定义与 broker 无关的 instrument、intent、order 和 fill 语言。
+- `portfolio` 负责 sizing、目标数量 reconciliation、cash/position accounting 和 fill application。
+- `backtest` 编排历史 daily event lifecycle 和模拟执行，不依赖 IBKR。
 - `risk` 负责风险指标、限制和控制规则。
 - 应用入口负责组合各模块，不把底层实现细节重新写入主流程。
 

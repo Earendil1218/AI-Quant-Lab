@@ -373,3 +373,58 @@ Phase 3D 需要建立未来 Backtest Engine 可稳定消费的边界，同时避
 - MA crossover 仅用于验证架构，不声明投资有效性。
 - Backtest、portfolio/risk 与 execution 负责未来的成交时点、仓位约束、现金、费用、滑点和订单；这些不属于 Strategy。
 - 当前不引入 event bus、async、数据库、message queue 或 broker integration。
+
+## 2026-08-29：Target Exposure、Sizing 与 Quantity 分层
+
+### Decision
+
+Phase 3D `target_position` 在 trading-domain boundary 中解释为 standardized target exposure：`1.0` 是 desired long state，`0.0` 是 desired flat state。它不代表 shares、NAV percentage、notional allocation 或固定金额。独立 `SizingPolicy` 将 `TargetExposureIntent` 转换为 `TargetQuantity`；Phase 3E 只实现确定性的 `FixedQuantitySizing`。
+
+### Reason
+
+- Strategy 决定期望状态，sizing 决定规模，portfolio reconciliation 决定交易差额。
+- 股票、期权及未来 risk-based sizing 可以共享 Strategy contract。
+- fixed quantity 是当前实现范围，不是长期 architecture limitation。
+
+### Impact
+
+- Portfolio planning 不硬编码 long quantity。
+- warm-up intent 不进入 quantity reconciliation，也不创建订单。
+- 当前只接受 `0.0`、`1.0` 或 unavailable；NAV/notional/volatility/option sizing 延后。
+
+## 2026-08-29：Order 与 Fill 分离，Fill 驱动 Portfolio Accounting
+
+### Decision
+
+`OrderRequest` 是 broker-neutral 执行请求，不改变 portfolio。只有已完成的 `Fill` 可以改变 cash 和 position quantity。Phase 3E 不加入 average cost，因为当前 mark-to-market 和 equity contract 不需要它，且 commission/cost-basis semantics 尚未进入需求。
+
+### Reason
+
+- 创建订单不等于成交。
+- simulated execution 和未来 broker adapter 可以产生同一种 Fill record。
+- 避免未定义的 partial reduction、full close 和 commission cost-basis behavior。
+
+### Impact
+
+- precise accounting 使用 Decimal；research、strategy 和 OHLCV DataFrame 保持 float64。
+- `BacktestResult` 保存 Decimal domain records，并提供 float64 pandas equity-curve view。
+- PlanningDecision（是否需要订单）与 ExecutionRejectionReason（为何不能成交）使用不同语义层。
+
+## 2026-08-29：Daily Backtest 使用 T Close Decision 与 T+1 Open Execution
+
+### Decision
+
+Phase 3E daily lifecycle 固定为：OPEN 执行前一 close 的 pending order；CLOSE mark-to-market、创建 end-of-day snapshot、观察完整 bar、生成下一 intent 与 pending order。T close signal 禁止在同一 T close 成交。
+
+### Reason
+
+- 日线数据无法证明在完整 T close 已知后仍可按该 close 成交。
+- next-open rule 对 signal、order 和 fill 时间提供明确可测试的因果边界。
+- Engine 每日只向 Strategy 提供截至当日的 history prefix，从编排层阻断 future data。
+
+### Impact
+
+- 最后一个 bar 产生的订单记录 `NO_NEXT_BAR` rejection。
+- insufficient cash 是 execution feasibility rejection，不与 target planning decision 混合。
+- 第一版仅支持 single equity、daily bars、long/flat、no leverage/no short，以及 fixed commission 和 basis-point slippage。
+- 所有 order/fill 都是离线模拟；broker 继续保持 IBKR read-only market-data boundary。

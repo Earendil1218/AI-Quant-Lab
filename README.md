@@ -4,11 +4,11 @@
 
 ### 中文
 
-AI Quant Lab 是一个持续演进的量化研究项目，长期目标是建设具备真实工程质量的市场数据、研究、回测、期权、组合风险与执行平台。当前 Phase 3 已建立从 IBKR 原始历史行情到标准化 processed 数据集的完整管道。
+AI Quant Lab 是一个持续演进的量化研究项目，长期目标是建设具备真实工程质量的市场数据、研究、回测、期权、组合风险与执行平台。当前 Phase 3 已建立从 IBKR 原始历史行情到标准化 processed 数据、研究指标、信号和策略意图的确定性链路。
 
 ### English
 
-AI Quant Lab is an evolving quantitative research project whose long-term goal is to become an engineering-focused platform for market data, research, backtesting, options, portfolio risk, and execution. Phase 3 now provides an end-to-end pipeline from raw IBKR history to a normalized processed dataset.
+AI Quant Lab is an evolving quantitative research project whose long-term goal is to become an engineering-focused platform for market data, research, backtesting, options, portfolio risk, and execution. Phase 3 now provides a deterministic path from raw IBKR history to processed data, research indicators, signals, and strategy intent.
 
 ## 项目起源 / Project Origin
 
@@ -82,8 +82,9 @@ AI-Quant-Lab/
 ├── tests/               # Offline tests with no real TWS dependency
 ├── docs/                # Context, status, decisions, roadmap, and workflow
 ├── notebooks/           # Exploratory research
+├── research/            # Pure returns, statistics, and indicators
 ├── pricing/             # Future options pricing and Greeks
-├── strategies/          # Future strategy research
+├── strategies/          # Pure signals and target-position intent
 ├── backtest/            # Future backtesting
 └── risk/                # Future portfolio and risk controls
 ```
@@ -179,7 +180,23 @@ Phase 3B established an independent `research` layer on the stable processed OHL
 
 Core definitions: simple return is the percentage change between adjacent closes; cumulative and rolling returns use `prod(1 + r) - 1`; annualized and rolling annualized volatility use sample standard deviation with `ddof=1` multiplied by `sqrt(periods_per_year)`; wealth index compounds growth from an initial value; drawdown measures wealth relative to its running peak and maximum drawdown is its minimum; active return is asset return minus benchmark return; tracking error is the annualized sample standard deviation of active returns; correlation is Pearson correlation over one common date sample shared by all assets.
 
-Date-aware research currently requires a timezone-naive, unique, ascending `DatetimeIndex`. Assets and benchmarks use their exact date intersection without filling missing returns or treating them as zero. Calculations still use the available raw close. Adjusted close, splits, and dividends are not handled, so results are price returns and not necessarily total returns. Strategy, backtesting, options, Greeks, and portfolio risk remain future capabilities.
+Date-aware research currently requires a timezone-naive, unique, ascending `DatetimeIndex`. Assets and benchmarks use their exact date intersection without filling missing returns or treating them as zero. Calculations still use the available raw close. Adjusted close, splits, and dividends are not handled, so results are price returns and not necessarily total returns. Backtesting, options, Greeks, and portfolio risk remain future capabilities.
+
+## Signal 与 Strategy Foundation / Signal and Strategy Foundation
+
+Phase 3D keeps trailing indicators in `research` and activates a separate `strategies` package for market-state signals and target-position intent. The reference moving-average crossover consumes only an in-memory processed OHLCV `DataFrame`:
+
+```python
+from strategies import MovingAverageCrossoverStrategy
+
+strategy = MovingAverageCrossoverStrategy(fast_window=20, slow_window=50)
+signals = strategy.generate_signals(processed_history)
+intents = strategy.generate_intents(processed_history)
+```
+
+`fast MA > slow MA` maps to target position `1.0` (long); `fast MA <= slow MA` maps to `0.0` (flat). Before the complete slow window exists, signal state is explicitly `unavailable` and target position is `NaN`. Rolling windows use only current and earlier observations: there is no backward fill or future-data access.
+
+Signal describes an observed market condition. Strategy converts that state into desired exposure. It never submits orders, reads broker positions, manages cash, or assumes fills; future backtest, portfolio/risk, and execution layers consume the intent contract separately.
 
 ## 安全边界 / Safety Boundary
 

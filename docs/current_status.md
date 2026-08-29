@@ -1,20 +1,20 @@
 # 当前项目状态 / Current Project Status
 
-最后更新 / Last updated: 2026-08-22
+最后更新 / Last updated: 2026-08-29
 
 ## 当前里程碑 / Current Milestone
 
 ### 中文
 
-- 版本：AI Quant Lab v0.6
-- Roadmap：Phase 3C — Performance and Comparative Research Foundation
-- 状态：Phase 3A、3B 和 3C 已实现；Phase 3C 等待最终 Git 工作流
+- 版本：AI Quant Lab v0.7
+- Roadmap：Phase 3D — Signal and Strategy Foundation
+- 状态：Phase 3A–3D 已实现；Phase 3D 正在 feature branch 验收
 
 ### English
 
-- Version: AI Quant Lab v0.6
-- Roadmap: Phase 3C — Performance and Comparative Research Foundation
-- Status: Phases 3A, 3B, and 3C are implemented; Phase 3C awaits the final Git workflow
+- Version: AI Quant Lab v0.7
+- Roadmap: Phase 3D — Signal and Strategy Foundation
+- Status: Phases 3A–3D are implemented; Phase 3D is under feature-branch acceptance
 
 ## 已完成 / Completed
 
@@ -31,6 +31,7 @@
 - 建立渐进式双语文档、docstring 和重要注释规范。
 - Phase 3B 已合并到 `main`，提供 simple/log/cumulative return 和基础统计。
 - Phase 3C 提供日期化收益、多资产精确日期对齐、财富与回撤、完整窗口滚动收益和波动率、benchmark 比较、active return、tracking error 与统一样本 Pearson correlation。
+- Phase 3D 提供 trailing moving average、显式 signal state、Strategy abstraction 和 long/flat target-position intent。
 
 ### English
 
@@ -45,12 +46,13 @@
 - Established progressive bilingual conventions for documentation, docstrings, and important comments.
 - Phase 3B is merged into `main` and provides simple, log, and cumulative returns plus basic statistics.
 - Phase 3C provides date-aware returns, exact-date multi-asset alignment, wealth and drawdown analysis, complete-window rolling returns and volatility, benchmark comparison, active returns, tracking error, and shared-sample Pearson correlation.
+- Phase 3D provides trailing moving averages, explicit signal states, a Strategy abstraction, and long/flat target-position intent.
 
 ## 已验证 / Verified
 
 ### 中文
 
-- 185 项 pytest 离线测试全部通过，无失败或 warning。
+- 213 项 pytest 离线测试全部通过，无失败或 warning。
 - processing、validation、raw/processed path 和 CSV round-trip 均由固定输入或 pytest 临时目录验证。
 - 测试不连接真实 TWS，不写入项目数据目录，也不调用订单接口。
 - Phase 2 曾由用户人工在线验证：成功获取、验证、保存并重载 251 条 NVDA 日线数据。
@@ -58,7 +60,7 @@
 
 ### English
 
-- All 185 offline pytest tests pass with no failures or warnings.
+- All 213 offline pytest tests pass with no failures or warnings.
 - Processing, validation, raw/processed paths, and CSV round trips use deterministic inputs or pytest temporary directories.
 - Tests do not connect to TWS, write to project data directories, or invoke order APIs.
 - Phase 2 was previously verified manually online with 251 NVDA daily bars fetched, validated, saved, and reloaded.
@@ -84,6 +86,22 @@
 - Active returns, common-start cumulative performance, annualized tracking error, and a shared-sample Pearson correlation matrix are supported.
 - Research remains pure in-memory calculation, decoupled from broker, storage, strategy, backtest, and portfolio layers.
 
+## Phase 3D / Signal and Strategy Foundation
+
+- `research.calculate_moving_average` 使用 trailing complete windows，只计算截至当日的观察。
+- Signal 输出显式携带 `signal_type`、MA 数值、state 和 numeric value。
+- Strategy intent 输出 `signal_type`、`signal_state` 和 float64 `target_position`。
+- warm-up 为 `unavailable` / `NaN`；`1.0` 表示 long，`0.0` 表示 flat。
+- MA crossover strategy 是冻结配置的纯内存 reference implementation，不连接 broker 或 execution。
+- future mutation 与 future append 测试锁定历史输出不变的 look-ahead policy。
+
+- `research.calculate_moving_average` uses trailing complete windows and observations available through each date only.
+- Signals explicitly carry a `signal_type`, MA values, state, and numeric value.
+- Strategy intent outputs `signal_type`, `signal_state`, and a float64 `target_position`.
+- Warm-up is `unavailable` / `NaN`; `1.0` means long and `0.0` means flat.
+- The MA crossover is a frozen-configuration, in-memory reference implementation with no broker or execution access.
+- Future-mutation and future-append tests lock the no-look-ahead policy.
+
 ## 已知限制 / Known Limitations
 
 ### 中文
@@ -93,7 +111,7 @@
 - 日线 date 必须不含时区；分钟线和多时区策略尚未设计。
 - 尚未处理拆股、分红或 adjusted price。
 - 尚未设计多交易所 calendar policy。
-- 尚未实现 Strategy、Backtest、Options、Greeks 或 Portfolio Risk。
+- 当前仅有单资产 long/flat MA crossover reference strategy；尚未实现 Backtest、Options、Greeks 或 Portfolio Risk。
 - 不支持自动化 Paper Trading 或 Live Trading。
 - 连接失败、contract qualify 失败和部分 IBKR 异常返回仍缺少离线测试。
 
@@ -104,19 +122,19 @@
 - Daily dates must be timezone-naive; intraday and multi-timezone policies are not yet designed.
 - Splits, dividends, and adjusted prices are not handled.
 - No multi-exchange calendar policy has been designed.
-- Strategy, backtesting, options, Greeks, and portfolio risk are not implemented.
+- Strategy scope is limited to a single-asset long/flat MA crossover reference; backtesting, options, Greeks, and portfolio risk are not implemented.
 - Automated paper trading and live trading are not supported.
 - Connection failures, contract qualification failures, and some IBKR error responses still lack offline tests.
 
 ## 下一步 / Next
 
-1. 完成 Phase 3C 的人工验收和独立 Git commit/push/PR 工作流。
-2. 重新评估下一阶段方向：股票 Signal/Strategy Foundation，或 Options Market Data / Pricing / Greeks。
-3. 增量更新、分钟线时区和 corporate actions 继续作为独立数据能力设计。
+1. 完成 Phase 3D feature branch 的人工验收和 Git commit/push/PR 工作流。
+2. 为未来 Backtest Engine 设计消费 target-position intent 的时间与执行语义。
+3. Options、增量更新、分钟线时区和 corporate actions 继续作为独立能力设计。
 
-1. Complete Phase 3C acceptance and its separate Git commit/push/PR workflow.
-2. Reassess the next direction: a stock Signal/Strategy Foundation or Options Market Data / Pricing / Greeks.
-3. Keep incremental updates, intraday timezone semantics, and corporate actions as separate data-capability designs.
+1. Complete Phase 3D feature-branch acceptance and its Git commit/push/PR workflow.
+2. Design how a future backtest engine consumes target-position intent, including timing and execution semantics.
+3. Keep options, incremental updates, intraday timezone semantics, and corporate actions as separate capabilities.
 
 当前安全限制保持不变：只允许只读市场数据访问，不包含订单或自动执行。
 

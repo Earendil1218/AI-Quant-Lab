@@ -16,6 +16,7 @@ from research.drawdown import (
     calculate_wealth_index,
     summarize_drawdowns,
 )
+from research.indicators import calculate_moving_average
 from research.returns import (
     calculate_cumulative_returns,
     calculate_log_returns,
@@ -39,6 +40,7 @@ __all__ = [
     "calculate_dated_simple_returns",
     "calculate_drawdowns",
     "calculate_log_returns",
+    "calculate_moving_average",
     "calculate_rolling_annualized_volatility",
     "calculate_rolling_compounded_returns",
     "calculate_return_correlation",

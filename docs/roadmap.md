@@ -140,21 +140,21 @@ Completion: public APIs have explicit definitions, deterministic offline tests l
 
 状态 / Status：已完成 / Completed.
 
-### 下一阶段架构评审 / Next-phase Architecture Review
+### Phase 3D：Signal and Strategy Foundation
 
-Phase 3C 完成后暂不继续无限扩展研究指标。下一阶段需在以下两个方向间重新评估优先级：
+主要能力：
 
-- A. 股票量化工作流：Signal / Strategy Foundation
-- B. 期权纵向能力：Options Market Data，随后是 Pricing / IV / Greeks
+- trailing simple moving average research indicator
+- 显式 signal state 与可选 numeric value
+- broker-independent Strategy abstraction 与 date-indexed target-position intent
+- 可配置的 moving-average crossover reference strategy
+- 完整窗口 warm-up 和 look-ahead protection
 
-After Phase 3C, the research metric surface should not expand indefinitely. The next architecture review must choose priorities between:
+完成标准：processed OHLCV 可以纯内存地产生确定性 signal 和 long/flat target position；未来数据变更不改变历史输出；不连接 broker、storage 或 execution。
 
-- A. Stock quantitative workflow: Signal / Strategy Foundation
-- B. Options vertical capability: Options Market Data followed by Pricing / IV / Greeks
+Completion: processed OHLCV produces deterministic in-memory signals and long/flat target positions; future-data changes cannot alter historical outputs; broker, storage, and execution remain outside this layer.
 
-本路线图记录两条方向，不在 Phase 3C 中替用户作出选择。
-
-This roadmap records both directions without selecting one during Phase 3C.
+状态 / Status：已实现，等待 feature branch 验收 / Implemented, pending feature-branch acceptance.
 
 ## Phase 4：期权数据
 

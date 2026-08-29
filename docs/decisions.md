@@ -341,3 +341,35 @@ Phase 3C introduces benchmarks, active returns, tracking error, and multi-asset 
 - Benchmark cumulative curves start from the same common observation.
 - Research continues to operate only on in-memory DataFrames/Series without broker access or file I/O.
 - After Phase 3C, unbounded metric expansion pauses; Signal/Strategy and Options remain alternative directions for the next review.
+
+## 2026-08-29：Signal、Strategy Intent 与 Execution 分层
+
+### Decision
+
+Trailing indicators 保留在 `research`；signal generation、Strategy abstraction 和 target-position intent 位于独立 `strategies` package。Signal 描述市场状态，Strategy 将状态转换为目标敞口。Strategy 不生成订单，也不访问 broker、账户、现金或实际持仓。
+
+Trailing indicators remain in `research`; signal generation, the Strategy abstraction, and target-position intent live in the independent `strategies` package. A signal describes market state, while a Strategy maps that state to desired exposure. Strategies do not create orders or access brokers, accounts, cash, or actual positions.
+
+### Context
+
+Phase 3D 需要建立未来 Backtest Engine 可稳定消费的边界，同时避免研究规则与执行状态耦合。当前 reference strategy 只需要单资产 long/flat 表达，不需要订单模型或通用事件系统。
+
+### Reason
+
+- `research` 回答指标是多少，signal 回答发生了什么，Strategy 回答期望持有什么。
+- date-indexed target position 可被未来 backtest 直接消费，而不暴露策略内部规则。
+- `SignalState` Enum 与 `Strategy` abstraction 固定公共语义；DataFrame 保持批量研究接口简单。
+- 冻结的策略参数保证配置稳定，纯内存计算保证确定性和可测试性。
+
+### Warm-up and look-ahead policy
+
+- Moving average 使用 trailing complete windows（`min_periods=window`）。
+- slow window 完成前 signal 为 `unavailable`，target position 为 `NaN`；未知状态不自动视为 flat、long 或 short。
+- 不 backward-fill。每个日期的结果只使用该日期及此前观察；修改或追加未来数据不得改变历史结果。
+
+### Impact
+
+- 公共 intent contract 为无时区、唯一、升序日期索引上的 `signal_type`、`signal_state` 与 float64 `target_position`；当前值为 `1.0` long、`0.0` flat、`NaN` unavailable。
+- MA crossover 仅用于验证架构，不声明投资有效性。
+- Backtest、portfolio/risk 与 execution 负责未来的成交时点、仓位约束、现金、费用、滑点和订单；这些不属于 Strategy。
+- 当前不引入 event bus、async、数据库、message queue 或 broker integration。

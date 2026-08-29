@@ -8,13 +8,13 @@
 
 - 版本：AI Quant Lab v0.8
 - Roadmap：Phase 3E — Trading Domain and Backtest Foundation
-- 状态：Phase 3A–3D 已合并；Phase 3E 正在 feature branch 验收
+- 状态：Phase 3A–3E 已完成并合并到 `main`
 
 ### English
 
 - Version: AI Quant Lab v0.8
 - Roadmap: Phase 3E — Trading Domain and Backtest Foundation
-- Status: Phases 3A–3D are merged; Phase 3E is under feature-branch acceptance
+- Status: Phases 3A–3E are completed and merged into `main`
 
 ## 已完成 / Completed
 
@@ -148,12 +148,12 @@
 
 ## 下一步 / Next
 
-1. 完成 Phase 3E feature branch 的人工验收和 Git commit/push/PR 工作流。
-2. 评审下一阶段 Portfolio Risk 或 broker execution abstraction 的优先级，不直接授权 Paper order submission。
+1. 评审下一小阶段的 architecture boundary，不自动开始 Phase 3F。
+2. 比较 Portfolio Risk 与 broker execution abstraction 的优先级；这不直接授权 Paper order submission。
 3. Options、增量更新、分钟线时区和 corporate actions 继续作为独立能力设计。
 
-1. Complete Phase 3E feature-branch acceptance and its Git commit/push/PR workflow.
-2. Review whether Portfolio Risk or a broker execution abstraction should come next; this does not authorize Paper order submission.
+1. Review the next small phase's architecture boundary without automatically starting Phase 3F.
+2. Compare Portfolio Risk and a broker execution abstraction as priorities; this does not authorize Paper order submission.
 3. Keep options, incremental updates, intraday timezone semantics, and corporate actions as separate capabilities.
 
 当前安全限制保持不变：broker 只允许只读市场数据访问；broker-neutral 模拟订单不会提交到 IBKR，不包含自动执行。

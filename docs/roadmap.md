@@ -180,7 +180,7 @@ Core capabilities:
 
 Completion: a single-equity daily long/flat strategy produces deterministic orders, fills, cash, positions, and an equity curve from Phase 3D intent through sizing, reconciliation, broker-neutral orders, simulated fills, and accounting. The core trading domain does not depend on pandas, IBKR, or ib_insync.
 
-状态 / Status：已实现，等待 feature branch 验收 / Implemented, pending feature-branch acceptance.
+状态 / Status：已完成并合并 / Completed and merged.
 
 ## Phase 4：期权数据
 

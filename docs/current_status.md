@@ -1,20 +1,20 @@
 # 当前项目状态 / Current Project Status
 
-最后更新 / Last updated: 2026-08-29
+最后更新 / Last updated: 2026-09-01
 
 ## 当前里程碑 / Current Milestone
 
 ### 中文
 
-- 版本：AI Quant Lab v0.8
-- Roadmap：Phase 3E — Trading Domain and Backtest Foundation
-- 状态：Phase 3A–3E 已完成并合并到 `main`
+- 版本：AI Quant Lab v0.9
+- Roadmap：Phase 3F — Pre-Trade Risk and Execution Handoff Foundation
+- 状态：Phase 3A–3F 已实现；Phase 3F 已人工验收，等待 PR 合并
 
 ### English
 
-- Version: AI Quant Lab v0.8
-- Roadmap: Phase 3E — Trading Domain and Backtest Foundation
-- Status: Phases 3A–3E are completed and merged into `main`
+- Version: AI Quant Lab v0.9
+- Roadmap: Phase 3F — Pre-Trade Risk and Execution Handoff Foundation
+- Status: Phases 3A–3F are implemented; Phase 3F passed human acceptance and awaits PR merge
 
 ## 已完成 / Completed
 
@@ -33,6 +33,7 @@
 - Phase 3C 提供日期化收益、多资产精确日期对齐、财富与回撤、完整窗口滚动收益和波动率、benchmark 比较、active return、tracking error 与统一样本 Pearson correlation。
 - Phase 3D 提供 trailing moving average、显式 signal state、Strategy abstraction 和 long/flat target-position intent。
 - Phase 3E 提供 broker-neutral trading domain、fixed-quantity sizing、portfolio accounting 和 next-open deterministic backtest vertical slice。
+- Phase 3F 提供 broker-neutral risk configuration、valuation context、deterministic risk decisions，以及 allowed-instrument、quantity、resulting-position 和 equity-notional checks。
 
 ### English
 
@@ -49,12 +50,13 @@
 - Phase 3C provides date-aware returns, exact-date multi-asset alignment, wealth and drawdown analysis, complete-window rolling returns and volatility, benchmark comparison, active returns, tracking error, and shared-sample Pearson correlation.
 - Phase 3D provides trailing moving averages, explicit signal states, a Strategy abstraction, and long/flat target-position intent.
 - Phase 3E provides a broker-neutral trading domain, fixed-quantity sizing, portfolio accounting, and a deterministic next-open backtest vertical slice.
+- Phase 3F provides broker-neutral risk configuration, valuation context, deterministic risk decisions, and allowed-instrument, quantity, resulting-position, and equity-notional checks.
 
 ## 已验证 / Verified
 
 ### 中文
 
-- 268 项 pytest 离线测试全部通过，无失败或 warning。
+- 294 项 pytest 离线测试全部通过，无失败或 warning。
 - processing、validation、raw/processed path 和 CSV round-trip 均由固定输入或 pytest 临时目录验证。
 - 测试不连接真实 TWS，不写入项目数据目录，也不调用订单接口。
 - Phase 2 曾由用户人工在线验证：成功获取、验证、保存并重载 251 条 NVDA 日线数据。
@@ -62,7 +64,7 @@
 
 ### English
 
-- All 268 offline pytest tests pass with no failures or warnings.
+- All 294 offline pytest tests pass with no failures or warnings.
 - Processing, validation, raw/processed paths, and CSV round trips use deterministic inputs or pytest temporary directories.
 - Tests do not connect to TWS, write to project data directories, or invoke order APIs.
 - Phase 2 was previously verified manually online with 251 NVDA daily bars fetched, validated, saved, and reloaded.
@@ -122,6 +124,26 @@
 - The daily lifecycle executes pending orders at OPEN, then marks/snapshots/observes/plans at CLOSE; same-close fills are prohibited.
 - Accounting uses Decimal while research/OHLCV remains float64; the equity curve is an explicit float64 pandas view.
 
+## Phase 3F / Pre-Trade Risk and Execution Handoff Foundation
+
+- `RiskConfiguration` 只启用显式配置的规则；`BacktestEngine.risk_configuration=None` 表示 risk layer disabled，而不是隐式宽松批准。
+- `evaluate_order_risk` 一旦调用即 fail closed，固定顺序检查 allowed instrument、order quantity、long-only resulting position、position quantity 和 equity order notional。
+- BUY resulting quantity 为 current + order；SELL 为 current - order；负结果使用 `SHORT_POSITION_NOT_ALLOWED` 在 risk boundary 拒绝。
+- `allowed_instruments=None` 表示规则 disabled；empty `frozenset` 表示不允许任何 instrument；只接受 `InstrumentId`。
+- Backtest 在真正到达 T+1 OPEN 时、simulation 前评估风险；notional 使用该 OPEN 的 `Decimal(str(price))` valuation。
+- 最后一根 bar 的 pending order 没有 risk horizon，直接产生 `NO_NEXT_BAR`；因此 orders 数量不一定等于 risk decisions 数量。
+- `RiskDecision.evaluated_at` 来自 `ValuationContext.observed_at`，不读取 wall clock。
+- Risk approval 不修改 portfolio、不创建 Fill，也不表示人工批准、提交授权或 broker acknowledgement。
+
+- `RiskConfiguration` enables only explicit rules; `BacktestEngine.risk_configuration=None` means the risk layer is disabled rather than implicitly approved by a permissive configuration.
+- Once called, `evaluate_order_risk` is fail-closed and checks allowed instrument, order quantity, long-only resulting position, position quantity, and equity order notional in a fixed order.
+- BUY resulting quantity is current + order; SELL is current - order; a negative result is rejected at the risk boundary with `SHORT_POSITION_NOT_ALLOWED`.
+- `allowed_instruments=None` disables that rule; an empty `frozenset` allows no instruments; only `InstrumentId` values are accepted.
+- Backtests evaluate risk only at an available T+1 OPEN before simulation; notional uses that OPEN converted through `Decimal(str(price))`.
+- A final-bar pending order has no risk horizon and receives `NO_NEXT_BAR` directly, so order and risk-decision counts need not match.
+- `RiskDecision.evaluated_at` comes from `ValuationContext.observed_at`, never the wall clock.
+- Risk approval neither mutates the portfolio nor creates a Fill, and it grants no human or broker-submission authority.
+
 ## 已知限制 / Known Limitations
 
 ### 中文
@@ -131,7 +153,7 @@
 - 日线 date 必须不含时区；分钟线和多时区策略尚未设计。
 - 尚未处理拆股、分红或 adjusted price。
 - 尚未设计多交易所 calendar policy。
-- 当前 backtest 仅支持 single-equity、daily、long/flat、fixed quantity、next-open execution；尚未实现 Options、Greeks 或 Portfolio Risk。
+- 当前 backtest 仅支持 single-equity、daily、long/flat、fixed quantity、next-open execution；尚未实现 Options、Greeks 或 advanced portfolio risk。
 - 不支持自动化 Paper Trading 或 Live Trading。
 - 连接失败、contract qualify 失败和部分 IBKR 异常返回仍缺少离线测试。
 
@@ -142,18 +164,18 @@
 - Daily dates must be timezone-naive; intraday and multi-timezone policies are not yet designed.
 - Splits, dividends, and adjusted prices are not handled.
 - No multi-exchange calendar policy has been designed.
-- Backtesting is limited to single-equity, daily, long/flat, fixed-quantity, next-open execution; options, Greeks, and portfolio risk are not implemented.
+- Backtesting is limited to single-equity, daily, long/flat, fixed-quantity, next-open execution; options, Greeks, and advanced portfolio risk are not implemented.
 - Automated paper trading and live trading are not supported.
 - Connection failures, contract qualification failures, and some IBKR error responses still lack offline tests.
 
 ## 下一步 / Next
 
-1. 评审下一小阶段的 architecture boundary，不自动开始 Phase 3F。
-2. 比较 Portfolio Risk 与 broker execution abstraction 的优先级；这不直接授权 Paper order submission。
+1. 审查并合并 Phase 3F PR，不自动开始 Phase 3G。
+2. Phase 3G 单独设计 execution lifecycle、ClientOrderId、idempotency 和 reconciliation；这不直接授权 Paper order submission。
 3. Options、增量更新、分钟线时区和 corporate actions 继续作为独立能力设计。
 
-1. Review the next small phase's architecture boundary without automatically starting Phase 3F.
-2. Compare Portfolio Risk and a broker execution abstraction as priorities; this does not authorize Paper order submission.
+1. Review and merge the Phase 3F PR without automatically starting Phase 3G.
+2. Design execution lifecycle, ClientOrderId, idempotency, and reconciliation separately in Phase 3G; this does not authorize Paper order submission.
 3. Keep options, incremental updates, intraday timezone semantics, and corporate actions as separate capabilities.
 
 当前安全限制保持不变：broker 只允许只读市场数据访问；broker-neutral 模拟订单不会提交到 IBKR，不包含自动执行。

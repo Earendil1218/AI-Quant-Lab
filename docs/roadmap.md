@@ -13,19 +13,17 @@
         ↓
 数据清洗与股票研究
         ↓
-期权数据
+股票 Signal / Strategy
         ↓
-期权定价、IV 与 Greeks
+Trading Domain / Backtest
         ↓
-策略研究
+Pre-Trade Risk / Execution Handoff
         ↓
-回测
+Execution Lifecycle / IBKR Paper Adapter / Paper Runner
         ↓
-风险管理
+期权数据、定价、Greeks、策略与风险扩展
         ↓
 AI 辅助研究
-        ↓
-Paper Trading 策略执行
         ↓
 Live Trading 研究（严格审批）
 ```
@@ -182,7 +180,39 @@ Completion: a single-equity daily long/flat strategy produces deterministic orde
 
 状态 / Status：已完成并合并 / Completed and merged.
 
-## Phase 4：期权数据
+### Phase 3F：Pre-Trade Risk and Execution Handoff Foundation
+
+主要能力：
+
+- broker-neutral `RiskConfiguration`、`ValuationContext` 和 `RiskDecision`
+- allowed instrument、order quantity、long-only resulting position 和 equity order-notional checks
+- risk disabled 与 fail-closed risk evaluation 的显式区分
+- T+1 OPEN risk evaluation → approved simulation 或独立 risk rejection
+- risk approval 与 human approval、submission authority、execution outcome 分离
+
+完成标准：相同 order、portfolio、valuation 和 configuration 产生相同 risk decision；risk 不修改 portfolio、不创建 Fill；未启用 risk 的 backtest 保持 Phase 3E 行为；broker 只读边界不变。
+
+状态 / Status：已实现并通过人工验收，等待 PR 合并 / Implemented and accepted, awaiting PR merge.
+
+### Phase 3G：Execution Lifecycle Foundation
+
+目标：在任何 broker submission 前设计 broker-neutral、stateful execution workflow。
+
+主要能力将包括 `ClientOrderId`、duplicate-submission protection、submission/acknowledgement、broker identity、order state、cancellation semantics、failure handling 和 reconciliation contracts。此阶段需要独立计划和批准，不自动获得订单提交权限。
+
+### Phase 3H：IBKR Paper Adapter
+
+目标：在 Phase 3G lifecycle 和安全控制稳定后，将 broker-neutral execution application layer 映射到 IBKR Paper environment。Paper/account/environment validation 不能只依赖端口号；实现前需要再次专项审批。
+
+### Phase 3I：Paper Trading Runner, Approval, and Reconciliation
+
+目标：组合 Strategy、Portfolio、Risk、human approval、Paper submission、monitoring 和 reconciliation。必须具备 fail-closed submission gate、operator-visible state 和 tested recovery semantics；不包含 Live Trading。
+
+## Phase 4+：Options Capability Track / 期权能力主线
+
+Options 在股票 Paper Trading 架构边界清晰后进入主线，并复用已建立的 Strategy、Trading、Portfolio、Risk 和 Execution 职责，而不是把股票语义写死到公共流程。
+
+### Phase 4：期权数据
 
 目标：建立期权合约与期权市场数据的获取和标准化能力。
 
@@ -197,7 +227,7 @@ Completion: a single-equity daily long/flat strategy produces deterministic orde
 
 完成标准：能够稳定获取并标准化研究所需的期权数据，且不包含订单操作。
 
-## Phase 5：期权定价、IV 与 Greeks
+### Phase 5：期权定价、IV 与 Greeks
 
 目标：建立可验证的期权定价分析能力。
 
@@ -212,7 +242,7 @@ Completion: a single-equity daily long/flat strategy produces deterministic orde
 
 完成标准：核心计算具有单元测试，并可与可信参考结果交叉验证。
 
-## Phase 6：策略研究
+### Phase 6：期权策略研究扩展
 
 目标：用明确、可复用的数据结构表达策略及其假设。
 
@@ -228,7 +258,7 @@ Completion: a single-equity daily long/flat strategy produces deterministic orde
 
 完成标准：策略输入、规则、成本假设和预期风险收益均可明确表达，不直接提交订单。
 
-## Phase 7：回测
+### Phase 7：期权回测扩展
 
 目标：使用历史数据评估策略表现和局限。
 
@@ -244,7 +274,7 @@ Completion: a single-equity daily long/flat strategy produces deterministic orde
 
 完成标准：回测结果可复现，关键假设透明，并具有基础正确性测试。
 
-## Phase 8：风险管理
+### Phase 8：高级 Portfolio / Options Risk 扩展
 
 目标：建立独立于具体策略的风险度量和限制体系。
 
@@ -274,23 +304,7 @@ Completion: a single-equity daily long/flat strategy produces deterministic orde
 
 完成标准：AI 不绕过测试、安全限制或人工审批，输出可以被复核和复现。
 
-## Phase 10：Paper Trading 策略执行
-
-目标：在模拟账户中验证从信号到执行的完整流程。
-
-主要能力：
-
-- 独立订单模型和执行接口
-- 订单前风险检查
-- 幂等、状态同步和审计记录
-- 紧急停止与人工确认机制
-- Paper Trading 端到端测试
-
-前置依赖：Phase 7 和 Phase 8，并需单独设计和批准。
-
-完成标准：所有执行仅限模拟账户，失败模式经过测试，且每项订单能力都有明确安全控制。
-
-## Phase 11：Live Trading 研究
+## Future：Live Trading 研究
 
 目标：仅在前序能力长期稳定后，评估真实交易所需的额外控制和合规要求。
 
@@ -301,6 +315,6 @@ Completion: a single-equity daily long/flat strategy produces deterministic orde
 - 监控、告警、审计和故障恢复
 - 小规模、可撤销的上线方案
 
-前置依赖：Phase 10 已充分验证，并获得用户针对 Live Trading 的明确专项授权。
+前置依赖：Phase 3I Paper Trading 已充分验证，并获得用户针对 Live Trading 的明确专项授权。
 
 完成标准：此阶段的具体标准必须在进入前重新设计和审批。路线图中列出该阶段不构成任何真实交易授权。

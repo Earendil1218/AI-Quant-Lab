@@ -35,9 +35,9 @@ broker market data → data → research → signal → strategy
                                              ↓
                                       target exposure
                                              ↓
-trading domain → sizing → portfolio planning → risk (future)
+trading domain → sizing → portfolio planning → pre-trade risk
                                              ↓
-                                    execution abstraction
+                              execution handoff / application
                                       ↙             ↘
                               backtest simulation   broker adapter (future)
 ```
@@ -50,7 +50,8 @@ trading domain → sizing → portfolio planning → risk (future)
 - `trading` 定义与 broker 无关的 instrument、intent、order 和 fill 语言。
 - `portfolio` 负责 sizing、目标数量 reconciliation、cash/position accounting 和 fill application。
 - `backtest` 编排历史 daily event lifecycle 和模拟执行，不依赖 IBKR。
-- `risk` 负责风险指标、限制和控制规则。
+- `risk` 负责 broker-neutral、确定性的交易前限制；风险通过不等于人工批准、提交授权、broker acknowledgement 或成交。
+- Phase 3F 只定义 execution handoff，不建立完整 execution package；stateful broker lifecycle 属于后续独立阶段。
 - 应用入口负责组合各模块，不把底层实现细节重新写入主流程。
 
 上层可以依赖下层提供的稳定接口；底层模块不应反向承担应用编排职责。

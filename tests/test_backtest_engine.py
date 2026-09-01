@@ -10,6 +10,7 @@ from pandas.testing import assert_frame_equal, assert_series_equal
 
 from backtest import BacktestEngine, ExecutionCosts
 from portfolio import FixedQuantitySizing
+from risk import RiskConfiguration, RiskDecisionStatus, RiskRejectionReason
 from strategies import MovingAverageCrossoverStrategy
 from trading import (
     AssetClass,
@@ -48,10 +49,12 @@ def engine(
     *,
     commission: str = "0",
     slippage_bps: str = "0",
+    risk_configuration: RiskConfiguration | None = None,
 ) -> BacktestEngine:
     return BacktestEngine(
         FixedQuantitySizing(quantity),
         ExecutionCosts(Decimal(commission), Decimal(slippage_bps)),
+        risk_configuration,
     )
 
 
@@ -111,6 +114,86 @@ def test_final_bar_order_is_rejected_for_no_next_bar() -> None:
     assert len(result.orders) == 1
     assert not result.fills
     assert result.rejections[0].reason is ExecutionRejectionReason.NO_NEXT_BAR
+
+
+def test_final_bar_no_next_bar_does_not_create_risk_decision() -> None:
+    result = engine(
+        risk_configuration=RiskConfiguration(
+            allowed_instruments=frozenset(),
+        )
+    ).run(
+        market_data([1, 2]),
+        MovingAverageCrossoverStrategy(1, 2),
+        NVDA,
+        initial_cash=Decimal("1000"),
+    )
+    assert len(result.orders) == 1
+    assert not result.risk_decisions
+    assert result.rejections[0].reason is ExecutionRejectionReason.NO_NEXT_BAR
+
+
+def test_risk_disabled_preserves_phase_3e_execution_path() -> None:
+    result = engine().run(
+        market_data([1, 2, 3], opens=[1, 2, 30]),
+        MovingAverageCrossoverStrategy(1, 2),
+        NVDA,
+        initial_cash=Decimal("1000"),
+    )
+    assert result.risk_decisions == ()
+    assert len(result.fills) == 1
+
+
+def test_risk_uses_next_open_valuation_and_rejection_skips_simulation() -> None:
+    result = engine(
+        quantity=10,
+        risk_configuration=RiskConfiguration(
+            maximum_order_notional=Decimal("250"),
+        ),
+    ).run(
+        market_data([1, 2, 3], opens=[1, 2, 30]),
+        MovingAverageCrossoverStrategy(1, 2),
+        NVDA,
+        initial_cash=Decimal("1000"),
+    )
+    assert len(result.risk_decisions) == 1
+    decision = result.risk_decisions[0]
+    assert decision.status is RiskDecisionStatus.REJECTED
+    assert decision.reason is RiskRejectionReason.ORDER_NOTIONAL_LIMIT_EXCEEDED
+    assert decision.evaluated_at.date().isoformat() == "2026-01-03"
+    assert not result.fills
+    assert len(result.rejections) == 1
+    assert result.rejections[0].reason is ExecutionRejectionReason.NO_NEXT_BAR
+    assert len(result.snapshots) == 3
+    assert result.snapshots[-1].cash == Decimal("1000")
+
+
+def test_risk_approval_is_recorded_before_execution_feasibility_rejection() -> None:
+    result = engine(
+        quantity=10,
+        risk_configuration=RiskConfiguration(),
+    ).run(
+        market_data([1, 2, 3], opens=[1, 2, 30]),
+        MovingAverageCrossoverStrategy(1, 2),
+        NVDA,
+        initial_cash=Decimal("100"),
+    )
+    assert result.risk_decisions[0].status is RiskDecisionStatus.APPROVED
+    assert result.rejections[0].reason is ExecutionRejectionReason.INSUFFICIENT_CASH
+
+
+def test_orders_can_outnumber_risk_decisions_when_last_order_has_no_horizon() -> None:
+    result = engine(
+        quantity=10,
+        risk_configuration=RiskConfiguration(),
+    ).run(
+        market_data([1, 2, 3, 2], opens=[1, 2, 3, 4]),
+        MovingAverageCrossoverStrategy(1, 2),
+        NVDA,
+        initial_cash=Decimal("1000"),
+    )
+    assert len(result.orders) == 2
+    assert len(result.risk_decisions) == 1
+    assert result.rejections[-1].reason is ExecutionRejectionReason.NO_NEXT_BAR
 
 
 def test_insufficient_cash_rejects_fill_and_preserves_state() -> None:

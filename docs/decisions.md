@@ -428,3 +428,45 @@ Phase 3E daily lifecycle 固定为：OPEN 执行前一 close 的 pending order�
 - insufficient cash 是 execution feasibility rejection，不与 target planning decision 混合。
 - 第一版仅支持 single equity、daily bars、long/flat、no leverage/no short，以及 fixed commission 和 basis-point slippage。
 - 所有 order/fill 都是离线模拟；broker 继续保持 IBKR read-only market-data boundary。
+
+## 2026-09-01：Pre-Trade Risk 与 Execution Handoff 分层
+
+### Decision
+
+Phase 3F 在 broker-neutral `OrderRequest` 与 execution 之间建立独立、确定性的 pre-trade risk boundary。`RiskConfiguration` 只启用显式配置的规则；`BacktestEngine.risk_configuration=None` 明确表示 risk layer disabled。一旦调用 `evaluate_order_risk`，evaluation 即严格 fail closed。
+
+Phase 3F establishes an independent, deterministic pre-trade risk boundary between a broker-neutral `OrderRequest` and execution. `RiskConfiguration` enables only explicitly configured rules; `BacktestEngine.risk_configuration=None` explicitly means that the risk layer is disabled. Once `evaluate_order_risk` is called, evaluation is strictly fail-closed.
+
+### Context
+
+Phase 3E 已能从 strategy intent 生成 order 并在 next OPEN 模拟成交，但没有策略无关的 risk decision。直接建立 broker lifecycle 会使 risk approval、submission authority、broker rejection 和 fill 混合。
+
+### Reason
+
+- Risk 消费 `OrderRequest`、`PortfolioState`、`ValuationContext` 和 `RiskConfiguration`，不访问 Strategy 或 IBKR。
+- `RiskDecision.evaluated_at` 使用 `ValuationContext.observed_at`，不读取 wall clock，保证相同输入产生相同结果。
+- BUY resulting quantity 定义为 current + order，SELL 定义为 current - order；负结果以 `SHORT_POSITION_NOT_ALLOWED` 拒绝。
+- `allowed_instruments=None` 表示规则未启用；empty `frozenset` 表示不允许任何 instrument；配置只接受 `InstrumentId`。
+- 第一版按固定顺序返回 first rejection，保持小 API 和确定性。
+- Risk approval 只表示通过风险检查，不表示 human approval、submission authorization、broker acknowledgement 或 Fill。
+
+### Backtest timing
+
+Phase 3F 的 daily backtest 在真正到达 T+1 OPEN 时统一执行 risk evaluation，并使用该 OPEN 估值检查 equity order notional。这是当前 application timing，不是所有 risk rules 的领域必然要求；allowed-instrument 和 quantity rules 本身不依赖价格。未来真实 execution 可以拆分 static 与 valuation-dependent checks，但本阶段不建立第二套 pipeline。
+
+最后一根 bar 在 close 生成的 pending order 没有 T+1 OPEN，也就没有 risk evaluation horizon。它继续直接产生 `ExecutionRejection(NO_NEXT_BAR)`，不使用 last close 代替 OPEN，也不产生 `RiskDecision`。因此 `orders` 数量不一定等于 `risk_decisions` 数量。
+
+### Alternatives
+
+- 未配置 risk 时隐式创建 permissive configuration。
+- 在 T close 使用 close price 风控所有 pending orders。
+- 将 risk、broker 和 simulation failures 放入同一个 rejection enum。
+- 现在引入完整 execution package、ClientOrderId 或 `ApprovedOrder` wrapper。
+
+### Impact
+
+- Risk evaluation 不修改 `PortfolioState`，不创建 Fill。
+- `INSUFFICIENT_CASH` 继续属于 execution/accounting feasibility；`NO_NEXT_BAR` 继续属于 backtest execution rejection。
+- Equity notional 明确为 price × quantity，且只支持 `AssetClass.EQUITY`；需要估值规则时，未知 asset class fail closed。
+- Phase 3F 只定义 execution handoff。ClientOrderId、idempotency、submission、broker lifecycle 和 reconciliation 延后到 Phase 3G。
+- Broker 继续只允许 IBKR readonly market-data access；本决定不授权任何订单 API。

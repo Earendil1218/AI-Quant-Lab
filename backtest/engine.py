@@ -15,6 +15,13 @@ from data.validation import validate_market_data
 from portfolio.planning import plan_target_order
 from portfolio.sizing import SizingPolicy
 from portfolio.state import PortfolioSnapshot, PortfolioState
+from risk import (
+    RiskConfiguration,
+    RiskDecision,
+    RiskDecisionStatus,
+    ValuationContext,
+    evaluate_order_risk,
+)
 from strategies.base import Strategy
 from trading.fills import ExecutionRejection, ExecutionRejectionReason, Fill
 from trading.instruments import InstrumentId
@@ -31,6 +38,13 @@ class BacktestEngine:
 
     sizing_policy: SizingPolicy
     execution_costs: ExecutionCosts = ExecutionCosts()
+    risk_configuration: RiskConfiguration | None = None
+
+    def __post_init__(self) -> None:
+        if self.risk_configuration is not None and not isinstance(
+            self.risk_configuration, RiskConfiguration
+        ):
+            raise TypeError("risk_configuration must be a RiskConfiguration or None.")
 
     def run(
         self,
@@ -50,6 +64,7 @@ class BacktestEngine:
         orders: list[OrderRequest] = []
         fills: list[Fill] = []
         rejections: list[ExecutionRejection] = []
+        risk_decisions: list[RiskDecision] = []
         snapshots: list[PortfolioSnapshot] = []
         pending: OrderRequest | None = None
 
@@ -59,18 +74,36 @@ class BacktestEngine:
 
             # OPEN: only the prior close's pending order may execute.
             if pending is not None:
-                outcome = simulate_next_open_execution(
-                    pending,
-                    open_price=float(row["open"]),
-                    filled_at=session_time,
-                    portfolio=portfolio,
-                    costs=self.execution_costs,
-                )
-                if isinstance(outcome, Fill):
-                    portfolio.apply_fill(outcome)
-                    fills.append(outcome)
-                else:
-                    rejections.append(outcome)
+                risk_approved = True
+                if self.risk_configuration is not None:
+                    valuation = ValuationContext(
+                        observed_at=session_time,
+                        prices={
+                            instrument: Decimal(str(row["open"])),
+                        },
+                    )
+                    risk_decision = evaluate_order_risk(
+                        pending,
+                        portfolio,
+                        valuation,
+                        self.risk_configuration,
+                    )
+                    risk_decisions.append(risk_decision)
+                    if risk_decision.status is RiskDecisionStatus.REJECTED:
+                        risk_approved = False
+                if risk_approved:
+                    outcome = simulate_next_open_execution(
+                        pending,
+                        open_price=float(row["open"]),
+                        filled_at=session_time,
+                        portfolio=portfolio,
+                        costs=self.execution_costs,
+                    )
+                    if isinstance(outcome, Fill):
+                        portfolio.apply_fill(outcome)
+                        fills.append(outcome)
+                    else:
+                        rejections.append(outcome)
                 pending = None
 
             # CLOSE: mark first, then expose the completed bar to Strategy.
@@ -102,5 +135,6 @@ class BacktestEngine:
             orders=tuple(orders),
             fills=tuple(fills),
             rejections=tuple(rejections),
+            risk_decisions=tuple(risk_decisions),
             snapshots=tuple(snapshots),
         )

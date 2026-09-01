@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from portfolio.state import PortfolioSnapshot
+from risk.models import RiskDecision
 from trading.fills import ExecutionRejection, Fill
 from trading.orders import OrderPlan, OrderRequest
 
@@ -18,6 +19,7 @@ class BacktestResult:
     fills: tuple[Fill, ...]
     rejections: tuple[ExecutionRejection, ...]
     snapshots: tuple[PortfolioSnapshot, ...]
+    risk_decisions: tuple[RiskDecision, ...] = ()
 
     def equity_curve(self) -> pd.Series:
         """Return a float64 analytics view while records retain Decimal values."""

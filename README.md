@@ -88,7 +88,7 @@ AI-Quant-Lab/
 ├── trading/             # Broker-neutral instruments, intents, orders, and fills
 ├── portfolio/           # Sizing, target reconciliation, and fill accounting
 ├── backtest/            # Deterministic daily simulation and analytics view
-└── risk/                # Future portfolio and risk controls
+└── risk/                # Broker-neutral deterministic pre-trade risk controls
 ```
 
 ## 运行环境 / Requirements
@@ -182,7 +182,7 @@ Phase 3B established an independent `research` layer on the stable processed OHL
 
 Core definitions: simple return is the percentage change between adjacent closes; cumulative and rolling returns use `prod(1 + r) - 1`; annualized and rolling annualized volatility use sample standard deviation with `ddof=1` multiplied by `sqrt(periods_per_year)`; wealth index compounds growth from an initial value; drawdown measures wealth relative to its running peak and maximum drawdown is its minimum; active return is asset return minus benchmark return; tracking error is the annualized sample standard deviation of active returns; correlation is Pearson correlation over one common date sample shared by all assets.
 
-Date-aware research currently requires a timezone-naive, unique, ascending `DatetimeIndex`. Assets and benchmarks use their exact date intersection without filling missing returns or treating them as zero. Calculations still use the available raw close. Adjusted close, splits, and dividends are not handled, so results are price returns and not necessarily total returns. Backtesting, options, Greeks, and portfolio risk remain future capabilities.
+Date-aware research currently requires a timezone-naive, unique, ascending `DatetimeIndex`. Assets and benchmarks use their exact date intersection without filling missing returns or treating them as zero. Calculations still use the available raw close. Adjusted close, splits, and dividends are not handled, so results are price returns and not necessarily total returns. Options, Greeks, and advanced portfolio risk remain future capabilities.
 
 ## Signal 与 Strategy Foundation / Signal and Strategy Foundation
 
@@ -198,7 +198,7 @@ intents = strategy.generate_intents(processed_history)
 
 `fast MA > slow MA` maps to target position `1.0` (long); `fast MA <= slow MA` maps to `0.0` (flat). Before the complete slow window exists, signal state is explicitly `unavailable` and target position is `NaN`. Rolling windows use only current and earlier observations: there is no backward fill or future-data access.
 
-Signal describes an observed market condition. Strategy converts that state into desired exposure. It never submits orders, reads broker positions, manages cash, or assumes fills; future backtest, portfolio/risk, and execution layers consume the intent contract separately.
+Signal describes an observed market condition. Strategy converts that state into desired exposure. It never submits orders, reads broker positions, manages cash, or assumes fills; backtest, portfolio, risk, and future execution layers consume the intent contract separately.
 
 ## Trading Domain 与 Backtest / Trading Domain and Backtest
 
@@ -221,6 +221,16 @@ TargetExposureIntent
 Daily lifecycle is explicit: after Day T closes, the completed bar produces an intent and pending order; at Day T+1 open, that pending order may fill; at Day T+1 close, the portfolio is marked and snapshotted before the next intent is generated. Same-close fills are prohibited.
 
 Domain accounting stores cash, fill prices, commissions, and equity as `Decimal`; research and OHLCV stay `float64`, while `BacktestResult.equity_curve()` provides a numeric pandas view. Orders are broker-neutral records only. This phase does not connect to the IBKR order API or perform Paper/Live Trading.
+
+## Pre-Trade Risk / 交易前风险
+
+Phase 3F adds a broker-neutral, deterministic risk boundary between a pending `OrderRequest` and simulated execution. Explicitly configured rules can restrict allowed `InstrumentId` values, order quantity, resulting long-only position quantity, and equity order notional. Risk evaluation never mutates `PortfolioState`, creates a `Fill`, or grants broker-submission authority.
+
+`BacktestEngine` keeps Phase 3E compatibility: when `risk_configuration` is `None`, the risk layer is disabled. Once risk evaluation is enabled, it is fail-closed and runs at the available T+1 OPEN before simulation; notional uses that OPEN valuation. A final-bar order with no T+1 OPEN receives `ExecutionRejectionReason.NO_NEXT_BAR` directly and is not risk-evaluated, so the number of orders can exceed the number of risk decisions.
+
+Phase 3F 在 pending `OrderRequest` 与模拟执行之间增加 broker-neutral、确定性的风险边界。显式配置的规则可以限制允许的 `InstrumentId`、订单数量、long-only resulting position quantity 和股票订单 notional。风险评估不修改 `PortfolioState`、不创建 `Fill`，也不授予 broker 提交权限。
+
+为保持 Phase 3E 兼容，`risk_configuration=None` 明确表示 risk layer 未启用；一旦启用，评估严格 fail-closed，并在存在真实 T+1 OPEN 时、simulation 之前运行。最后一根 bar 产生但没有下一 OPEN 的订单直接记录 `NO_NEXT_BAR`，不产生 `RiskDecision`，因此 orders 数量不保证等于 risk decisions 数量。
 
 ## 安全边界 / Safety Boundary
 

@@ -470,3 +470,29 @@ Phase 3F 的 daily backtest 在真正到达 T+1 OPEN 时统一执行 risk evalua
 - Equity notional 明确为 price × quantity，且只支持 `AssetClass.EQUITY`；需要估值规则时，未知 asset class fail closed。
 - Phase 3F 只定义 execution handoff。ClientOrderId、idempotency、submission、broker lifecycle 和 reconciliation 延后到 Phase 3G。
 - Broker 继续只允许 IBKR readonly market-data access；本决定不授权任何订单 API。
+
+## 2026-09-03：Broker-Neutral Execution Lifecycle 独立分层
+
+### Decision
+
+新增独立 `execution` package，管理本系统生成的 `ClientOrderId`、显式 `SubmissionAuthorization`、immutable `ExecutionOrder`、broker identity、partial-fill provenance、optimistic repository contract 和 reconciliation-friendly observations。`OrderRequest` 继续只表达交易经济意图，`trading.Fill` 继续只表达经济成交；两者均不承载 stateful execution identity。
+
+### Reason
+
+- Risk approval 只证明 financial/pre-trade checks passed，不是 human approval 或 submission permission；submission 必须绑定单独的成功型 authorization capability。
+- `ClientOrderId` 在 execution lifecycle 创建时由系统生成并保持稳定；`BrokerOrderId` 和 `BrokerExecutionId` 是可选外部身份，不能替代本地 identity。
+- 外部 submission 具有无法原子提交本地状态和 broker side effect 的 dual-write 风险，因此必须先保存 `AUTHORIZED → SUBMISSION_PENDING`，未来 adapter 才能发送请求。
+- timeout/disconnect 后的 `UNKNOWN` 不是失败；它表示 broker 是否收到请求不可确定，禁止自动重提并只能经 reconciliation 或 operator resolution 收敛。
+- `ExecutionFill` 为现有 economic `Fill` 增加 client/fill/broker execution provenance，使 multiple fills 和 duplicate delivery 可在 portfolio accounting 之前处理，而不破坏已有 Fill contract。
+
+### Repository and idempotency
+
+`ExecutionOrderRepository` 提供 `add/get/save(expected_version)` contract。`InMemoryExecutionOrderRepository` 仅用于 Phase 3G、unit tests 和 offline development，不提供 process crash、restart 或 durable persistence guarantee。相同 `ClientOrderId` 只能从 `AUTHORIZED` 一次进入 `SUBMISSION_PENDING`；optimistic version 防止 stale overwrite；相同 fill identity replay 不重复增加 cumulative quantity，并通过 acceptance flag 阻止重复 portfolio application。
+
+### Boundaries and impact
+
+- Phase 3G 不修改 `BacktestEngine`：deterministic historical simulation 没有 network timeout、broker acknowledgement 或 restart reconciliation，不应被强制包装成 broker workflow simulator。
+- `risk` 不依赖 `execution`；execution 可以消费现有 `RiskDecision` contract 来验证 authorization binding。
+- `broker/` 保持 read-only market-data boundary，不增加 `placeOrder`、`cancelOrder`、order callbacks 或 query APIs。
+- IBKR adapter 和 identity mapping 延后到 Phase 3H；persistent repository、human approval workflow、Paper runner、automatic recovery、outstanding-order-aware planning、broker/local portfolio reconciliation、monitoring 和 alerts 延后到 Phase 3I。
+- 本决定不提供 Paper 或 Live Trading 授权，也不建立完整 OMS。

@@ -88,7 +88,8 @@ AI-Quant-Lab/
 ├── trading/             # Broker-neutral instruments, intents, orders, and fills
 ├── portfolio/           # Sizing, target reconciliation, and fill accounting
 ├── backtest/            # Deterministic daily simulation and analytics view
-└── risk/                # Broker-neutral deterministic pre-trade risk controls
+├── risk/                # Broker-neutral deterministic pre-trade risk controls
+└── execution/           # Broker-neutral identity, authorization, and lifecycle state
 ```
 
 ## 运行环境 / Requirements
@@ -231,6 +232,22 @@ Phase 3F adds a broker-neutral, deterministic risk boundary between a pending `O
 Phase 3F 在 pending `OrderRequest` 与模拟执行之间增加 broker-neutral、确定性的风险边界。显式配置的规则可以限制允许的 `InstrumentId`、订单数量、long-only resulting position quantity 和股票订单 notional。风险评估不修改 `PortfolioState`、不创建 `Fill`，也不授予 broker 提交权限。
 
 为保持 Phase 3E 兼容，`risk_configuration=None` 明确表示 risk layer 未启用；一旦启用，评估严格 fail-closed，并在存在真实 T+1 OPEN 时、simulation 之前运行。最后一根 bar 产生但没有下一 OPEN 的订单直接记录 `NO_NEXT_BAR`，不产生 `RiskDecision`，因此 orders 数量不保证等于 risk decisions 数量。
+
+## Execution Lifecycle / 执行生命周期
+
+Phase 3G adds a broker-neutral `execution` boundary after planning and risk. A stable `ClientOrderId` identifies one logical execution; an explicit `SubmissionAuthorization` is required before the immutable order can enter `SUBMISSION_PENDING`. This state must be saved before any future broker side effect. `UNKNOWN` means delivery to the broker cannot be determined and therefore blocks resubmission until reconciliation or operator resolution. Broker identities and execution-fill identities remain separate from local identity, while `ExecutionFill` associates provenance with the unchanged economic `trading.Fill`.
+
+Phase 3G 在 planning 和 risk 之后增加 broker-neutral `execution` 边界。稳定的 `ClientOrderId` 标识一个逻辑执行；immutable order 必须获得独立 `SubmissionAuthorization` 才能进入 `SUBMISSION_PENDING`，且该状态必须在未来任何 broker 副作用之前保存。`UNKNOWN` 表示无法判断 broker 是否收到请求，因此在 reconciliation 或人工处置前禁止重新提交。Broker identity、execution-fill identity 与本地 identity 保持分离，`ExecutionFill` 为未改变的 economic `trading.Fill` 关联执行来源。
+
+```text
+strategy → planning → risk → authorization → execution lifecycle
+                                                ↓
+                                      future broker adapter
+```
+
+The included repository is deliberately in-memory and provides no crash or restart durability. Phase 3G does not connect to IBKR and provides no `placeOrder`, `cancelOrder`, Paper runner, persistent repository, automatic retry, or Live Trading capability.
+
+当前 repository 仅为内存实现，不提供 crash 或 restart durability。Phase 3G 不连接 IBKR，也不提供 `placeOrder`、`cancelOrder`、Paper runner、持久化 repository、自动重试或 Live Trading 能力。
 
 ## 安全边界 / Safety Boundary
 

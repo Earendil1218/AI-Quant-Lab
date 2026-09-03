@@ -192,21 +192,23 @@ Completion: a single-equity daily long/flat strategy produces deterministic orde
 
 完成标准：相同 order、portfolio、valuation 和 configuration 产生相同 risk decision；risk 不修改 portfolio、不创建 Fill；未启用 risk 的 backtest 保持 Phase 3E 行为；broker 只读边界不变。
 
-状态 / Status：已实现并通过人工验收，等待 PR 合并 / Implemented and accepted, awaiting PR merge.
+状态 / Status：已完成并合并 / Completed and merged.
 
-### Phase 3G：Execution Lifecycle Foundation
+### Phase 3G：Broker-Neutral Execution Lifecycle Foundation
 
 目标：在任何 broker submission 前设计 broker-neutral、stateful execution workflow。
 
-主要能力将包括 `ClientOrderId`、duplicate-submission protection、submission/acknowledgement、broker identity、order state、cancellation semantics、failure handling 和 reconciliation contracts。此阶段需要独立计划和批准，不自动获得订单提交权限。
+主要能力包括 `ClientOrderId`、独立 `SubmissionAuthorization`、durable-intent-before-side-effect contract、duplicate-submission protection、submission/acknowledgement、`UNKNOWN` outcome、broker identity、partial-fill identity、cancellation race、optimistic repository contract 和 reconciliation-friendly observations。内存 repository 不提供 restart durability；本阶段不接入任何 broker order API，也不自动获得订单提交权限。
+
+完成标准：immutable execution aggregate 和合法 transition 可由确定性离线测试验证；相同 `ClientOrderId` 不能重复进入 submission；duplicate fills 不重复记账；UNKNOWN 只能经 reconciliation/manual resolution 收敛；现有 backtest、risk、planning、trading Fill 和 broker read-only 边界保持不变。
 
 ### Phase 3H：IBKR Paper Adapter
 
 目标：在 Phase 3G lifecycle 和安全控制稳定后，将 broker-neutral execution application layer 映射到 IBKR Paper environment。Paper/account/environment validation 不能只依赖端口号；实现前需要再次专项审批。
 
-### Phase 3I：Paper Trading Runner, Approval, and Reconciliation
+### Phase 3I：Paper Runner, Approval, Persistence, and Reconciliation
 
-目标：组合 Strategy、Portfolio、Risk、human approval、Paper submission、monitoring 和 reconciliation。必须具备 fail-closed submission gate、operator-visible state 和 tested recovery semantics；不包含 Live Trading。
+目标：组合 Strategy、Portfolio、Risk、human approval、persistent execution repository、Paper submission、monitoring 和 reconciliation。必须具备 fail-closed submission gate、operator-visible state、outstanding-order-aware planning 和 tested restart/recovery semantics；不包含 Live Trading。
 
 ## Phase 4+：Options Capability Track / 期权能力主线
 

@@ -1,20 +1,20 @@
 # 当前项目状态 / Current Project Status
 
-最后更新 / Last updated: 2026-09-01
+最后更新 / Last updated: 2026-09-03
 
 ## 当前里程碑 / Current Milestone
 
 ### 中文
 
-- 版本：AI Quant Lab v0.9
-- Roadmap：Phase 3F — Pre-Trade Risk and Execution Handoff Foundation
-- 状态：Phase 3A–3F 已实现；Phase 3F 已人工验收，等待 PR 合并
+- 版本：AI Quant Lab v0.10
+- Roadmap：Phase 3G — Broker-Neutral Execution Lifecycle Foundation
+- 状态：Phase 3A–3F 已合并；Phase 3G 已在 feature branch 实现并通过离线验证，等待人工审查
 
 ### English
 
-- Version: AI Quant Lab v0.9
-- Roadmap: Phase 3F — Pre-Trade Risk and Execution Handoff Foundation
-- Status: Phases 3A–3F are implemented; Phase 3F passed human acceptance and awaits PR merge
+- Version: AI Quant Lab v0.10
+- Roadmap: Phase 3G — Broker-Neutral Execution Lifecycle Foundation
+- Status: Phases 3A–3F are merged; Phase 3G is implemented and verified offline on its feature branch, awaiting human review
 
 ## 已完成 / Completed
 
@@ -34,6 +34,7 @@
 - Phase 3D 提供 trailing moving average、显式 signal state、Strategy abstraction 和 long/flat target-position intent。
 - Phase 3E 提供 broker-neutral trading domain、fixed-quantity sizing、portfolio accounting 和 next-open deterministic backtest vertical slice。
 - Phase 3F 提供 broker-neutral risk configuration、valuation context、deterministic risk decisions，以及 allowed-instrument、quantity、resulting-position 和 equity-notional checks。
+- Phase 3G 提供 broker-neutral execution identities、显式 submission authorization、immutable lifecycle、optimistic repository contract、partial-fill deduplication 和 reconciliation-friendly observations。
 
 ### English
 
@@ -51,12 +52,13 @@
 - Phase 3D provides trailing moving averages, explicit signal states, a Strategy abstraction, and long/flat target-position intent.
 - Phase 3E provides a broker-neutral trading domain, fixed-quantity sizing, portfolio accounting, and a deterministic next-open backtest vertical slice.
 - Phase 3F provides broker-neutral risk configuration, valuation context, deterministic risk decisions, and allowed-instrument, quantity, resulting-position, and equity-notional checks.
+- Phase 3G provides broker-neutral execution identities, explicit submission authorization, an immutable lifecycle, an optimistic repository contract, partial-fill deduplication, and reconciliation-friendly observations.
 
 ## 已验证 / Verified
 
 ### 中文
 
-- 294 项 pytest 离线测试全部通过，无失败或 warning。
+- 331 项 pytest 离线测试全部通过，无失败或 warning；其中 37 项为 Phase 3G execution lifecycle 测试。
 - processing、validation、raw/processed path 和 CSV round-trip 均由固定输入或 pytest 临时目录验证。
 - 测试不连接真实 TWS，不写入项目数据目录，也不调用订单接口。
 - Phase 2 曾由用户人工在线验证：成功获取、验证、保存并重载 251 条 NVDA 日线数据。
@@ -64,7 +66,7 @@
 
 ### English
 
-- All 294 offline pytest tests pass with no failures or warnings.
+- All 331 offline pytest tests pass with no failures or warnings, including 37 Phase 3G execution-lifecycle tests.
 - Processing, validation, raw/processed paths, and CSV round trips use deterministic inputs or pytest temporary directories.
 - Tests do not connect to TWS, write to project data directories, or invoke order APIs.
 - Phase 2 was previously verified manually online with 251 NVDA daily bars fetched, validated, saved, and reloaded.
@@ -144,6 +146,24 @@
 - `RiskDecision.evaluated_at` comes from `ValuationContext.observed_at`, never the wall clock.
 - Risk approval neither mutates the portfolio nor creates a Fill, and it grants no human or broker-submission authority.
 
+## Phase 3G / Broker-Neutral Execution Lifecycle Foundation
+
+- 独立 `execution` package 定义系统生成的 `ClientOrderId`，并将 `BrokerOrderId`、`BrokerExecutionId` 和 `ExecutionFillId` 保持为不同身份。
+- `SubmissionAuthorization` 显式绑定 client order、完整 request、时间和 audit authority；只有匹配的 approved `RiskDecision` 才能使 execution order 进入 `AUTHORIZED`。
+- immutable `ExecutionOrder` 和纯 lifecycle functions 覆盖 CREATED、AUTHORIZED、SUBMISSION_PENDING、SUBMITTED、ACKNOWLEDGED、PARTIALLY_FILLED、FILLED、CANCEL_PENDING、CANCELLED、REJECTED 和 UNKNOWN。
+- `AUTHORIZED → SUBMISSION_PENDING` 建立 durable-intent-before-side-effect contract；UNKNOWN 禁止重复 begin submission，只能通过 reconciliation 或人工处置收敛。
+- repository protocol 提供 add/get/optimistic save；in-memory implementation 明确不提供 crash/restart durability。
+- `ExecutionFill` 关联 unchanged economic `Fill`，支持 multiple fills、overfill protection、fill identity deduplication 和 cancel race 中的 late fills。
+- broker-neutral observations 和 reconciliation results 不执行 broker I/O、polling 或 portfolio-position reconciliation。
+
+- The independent `execution` package defines system-generated `ClientOrderId` values while keeping broker order, broker execution, and execution-fill identities separate.
+- `SubmissionAuthorization` explicitly binds the client order, complete request, timestamp, and audit authority; only a matching approved `RiskDecision` can move an execution order to `AUTHORIZED`.
+- The immutable aggregate and pure lifecycle functions cover CREATED, AUTHORIZED, SUBMISSION_PENDING, SUBMITTED, ACKNOWLEDGED, PARTIALLY_FILLED, FILLED, CANCEL_PENDING, CANCELLED, REJECTED, and UNKNOWN.
+- `AUTHORIZED → SUBMISSION_PENDING` establishes the durable-intent-before-side-effect contract. UNKNOWN blocks resubmission until reconciliation or manual resolution.
+- The repository protocol provides add/get/optimistic-save semantics; its in-memory implementation explicitly provides no crash or restart durability.
+- `ExecutionFill` associates provenance with the unchanged economic `Fill` and supports multiple fills, overfill protection, identity deduplication, and late fills during cancellation.
+- Broker-neutral observations and reconciliation results perform no broker I/O, polling, or portfolio-position reconciliation.
+
 ## 已知限制 / Known Limitations
 
 ### 中文
@@ -155,6 +175,7 @@
 - 尚未设计多交易所 calendar policy。
 - 当前 backtest 仅支持 single-equity、daily、long/flat、fixed quantity、next-open execution；尚未实现 Options、Greeks 或 advanced portfolio risk。
 - 不支持自动化 Paper Trading 或 Live Trading。
+- 尚未实现 IBKR order adapter/callback/query、persistent execution repository、human approval workflow、automatic retry/restart recovery、Paper runner、outstanding-order-aware planning、broker/local portfolio reconciliation、monitoring、alerts 或 OMS。
 - 连接失败、contract qualify 失败和部分 IBKR 异常返回仍缺少离线测试。
 
 ### English
@@ -166,16 +187,17 @@
 - No multi-exchange calendar policy has been designed.
 - Backtesting is limited to single-equity, daily, long/flat, fixed-quantity, next-open execution; options, Greeks, and advanced portfolio risk are not implemented.
 - Automated paper trading and live trading are not supported.
+- IBKR order adapters/callbacks/queries, durable execution persistence, human approval workflow, automatic retry/restart recovery, a Paper runner, outstanding-order-aware planning, broker/local portfolio reconciliation, monitoring, alerts, and an OMS are not implemented.
 - Connection failures, contract qualification failures, and some IBKR error responses still lack offline tests.
 
 ## 下一步 / Next
 
-1. 审查并合并 Phase 3F PR，不自动开始 Phase 3G。
-2. Phase 3G 单独设计 execution lifecycle、ClientOrderId、idempotency 和 reconciliation；这不直接授权 Paper order submission。
+1. 人工审查 Phase 3G implementation、tests 和安全边界；未经授权不 commit/push/merge。
+2. Phase 3H 在独立批准后实现 IBKR Paper Adapter；当前 Phase 3G 不直接授权任何 Paper order submission。
 3. Options、增量更新、分钟线时区和 corporate actions 继续作为独立能力设计。
 
-1. Review and merge the Phase 3F PR without automatically starting Phase 3G.
-2. Design execution lifecycle, ClientOrderId, idempotency, and reconciliation separately in Phase 3G; this does not authorize Paper order submission.
+1. Review the Phase 3G implementation, tests, and safety boundary; do not commit, push, or merge without authorization.
+2. Implement the IBKR Paper Adapter in Phase 3H only after separate approval; Phase 3G grants no Paper-order submission authority.
 3. Keep options, incremental updates, intraday timezone semantics, and corporate actions as separate capabilities.
 
 当前安全限制保持不变：broker 只允许只读市场数据访问；broker-neutral 模拟订单不会提交到 IBKR，不包含自动执行。

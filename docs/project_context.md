@@ -39,7 +39,7 @@ trading domain → sizing → portfolio planning → pre-trade risk
                                              ↓
                               execution handoff / application
                                       ↙             ↘
-                              backtest simulation   broker adapter (future)
+                              backtest simulation   IBKR adapter (locked)
 ```
 
 - `config` 管理运行参数，不包含业务流程。
@@ -56,6 +56,18 @@ trading domain → sizing → portfolio planning → pre-trade risk
 - 应用入口负责组合各模块，不把底层实现细节重新写入主流程。
 
 上层可以依赖下层提供的稳定接口；底层模块不应反向承担应用编排职责。
+
+### Phase 3H 执行边界 / Execution Boundary
+
+中文：broker/ibkr 负责固定 ib-insync 0.9.86 的专用只读 session、原始 callback、身份与 MKT 映射。execution 负责中立 Protocol、内存一次性 claim 和显式观察应用。调用方先保存 SUBMISSION_PENDING/CANCEL_PENDING 再 dispatch；adapter 不保存 aggregate。多个 adapter 共享 claims/registry，应用层串行化写入与发送。真实订单 transport 始终锁闭，不因配置 opt-in 放行。
+
+English: broker/ibkr owns a dedicated read-only session, raw callbacks, identities and MKT mapping for pinned ib-insync 0.9.86. execution owns neutral protocols, process-lifetime claims and explicit observation application. Callers save SUBMISSION_PENDING/CANCEL_PENDING before dispatch; adapters do not persist aggregates. Adapters share claims/registries and callers serialize writes with dispatch. Real order transport remains locked even with opt-in.
+
+中文：ClientOrderId、API orderId、permId、execId 分离。broker completion 与经济成交分离；execution 和真实 commission 配对后才生成 immutable Fill。本地应用时间与经济时间分离。backtest 不经过此 network lifecycle，也不依赖 IBKR。持久化、recovery、审批 workflow、Paper runner、周期/组合 reconciliation 和监控属于 Phase 3I；Live Trading 不在当前范围。
+
+English: ClientOrderId, API orderId, permId and execId remain separate. Broker completion is separate from economic execution; immutable fills require execution and actual commission pairing. Local application time is distinct from economic time. Backtests do not traverse this network lifecycle or depend on IBKR. Persistence, recovery, approval workflow, a Paper runner, periodic/portfolio reconciliation and monitoring belong to Phase 3I; Live Trading remains out of scope.
+
+详细设计 / Detailed design: [IBKR execution foundation](ibkr_execution.md).
 
 ## 核心技术栈
 

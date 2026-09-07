@@ -277,8 +277,8 @@ def test_late_fills_during_cancel_can_remain_partial_or_fill() -> None:
     partial, accepted = record_fill(
         cancelling, execution_fill("f2", 20, minute=8)
     )
-    assert accepted and partial.state is ExecutionOrderState.PARTIALLY_FILLED
-    cancelling = request_cancellation(partial, at(9))
+    assert accepted and partial.state is ExecutionOrderState.CANCEL_PENDING
+    cancelling = partial
     filled, accepted = record_fill(
         cancelling, execution_fill("f3", 50, minute=10)
     )
@@ -317,8 +317,12 @@ def test_unknown_converges_from_broker_observations(state, quantity) -> None:
         CID, state, at(5), BrokerOrderId("broker-1"), quantity
     )
     resolved = apply_broker_order_observation(unknown, observation)
-    assert resolved.state is state
-    assert resolved.cumulative_filled_quantity == quantity
+    assert resolved.state is (state if quantity == 0 else ExecutionOrderState.UNKNOWN)
+    assert resolved.cumulative_filled_quantity == 0
+    assert resolved.fills == ()
+    if quantity:
+        assert resolved is unknown
+        assert reconcile_order(resolved, observation).issues[0].kind is ReconciliationIssueKind.FILL_QUANTITY_MISMATCH
 
 
 def test_reconciliation_reports_unresolved_and_accepts_duplicate_observation() -> None:

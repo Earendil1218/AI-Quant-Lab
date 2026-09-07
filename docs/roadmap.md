@@ -202,13 +202,17 @@ Completion: a single-equity daily long/flat strategy produces deterministic orde
 
 完成标准：immutable execution aggregate 和合法 transition 可由确定性离线测试验证；相同 `ClientOrderId` 不能重复进入 submission；duplicate fills 不重复记账；UNKNOWN 只能经 reconciliation/manual resolution 收敛；现有 backtest、risk、planning、trading Fill 和 broker read-only 边界保持不变。
 
-### Phase 3H：IBKR Paper Adapter
+### Phase 3H — IBKR Paper Execution Adapter Foundation
 
-目标：在 Phase 3G lifecycle 和安全控制稳定后，将 broker-neutral execution application layer 映射到 IBKR Paper environment。Paper/account/environment validation 不能只依赖端口号；实现前需要再次专项审批。
+中文：已在 feature branch 实现并离线验证，尚未提交，等待审查。包括单一美股 MKT 映射、身份分离、一次性 claim、submit/cancel boundary、raw callbacks、错误归一化、execution/commission pairing。真实订单 transport 始终锁闭；内存 repository/claim 不提供 crash durability；不以实际下单验收。
 
-### Phase 3I：Paper Runner, Approval, Persistence, and Reconciliation
+English: Implemented and verified offline on the feature branch, uncommitted and awaiting review. Includes single-US-equity MKT mapping, separate identities, one-shot claims, submit/cancel boundaries, raw callbacks, error normalization and execution/commission pairing. Real order transport stays locked. Memory stores are not crash-durable; actual orders are not an acceptance requirement.
 
-目标：组合 Strategy、Portfolio、Risk、human approval、persistent execution repository、Paper submission、monitoring 和 reconciliation。必须具备 fail-closed submission gate、operator-visible state、outstanding-order-aware planning 和 tested restart/recovery semantics；不包含 Live Trading。
+### Phase 3I — Paper Trading Runner & Recovery Foundation
+
+中文：候选范围为生产持久化 execution repository、restart recovery、显式人工审批、Paper runner、未完成订单感知 planning、周期 reconciliation、broker/local portfolio reconciliation、audit trail、operational monitoring 和 alerts。必须先设计可验证的 Paper 账户证明、状态/会计事务和安全恢复，才能考虑解锁真实 Paper transport。自动 retry/resubmission 不得绕过 UNKNOWN 或重复订单保护。Live Trading、options execution 不自动纳入本阶段。
+
+English: Candidates include production persistence, restart recovery, explicit approval, a Paper runner, outstanding-order-aware planning, periodic reconciliation, broker/local portfolio reconciliation, audit trails, monitoring and alerts. Verified Paper-account evidence, state/accounting transactions and safe recovery must precede unlocking real Paper transport. Automatic retry/resubmission must not bypass UNKNOWN or duplicate-order protection. Live Trading and options execution are not implicitly included.
 
 ## Phase 4+：Options Capability Track / 期权能力主线
 

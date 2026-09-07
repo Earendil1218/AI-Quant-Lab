@@ -31,8 +31,17 @@ from execution.models import (
     SubmissionAuthorization,
 )
 from execution.repository import ExecutionOrderRepository, InMemoryExecutionOrderRepository
+from execution.adapter import DispatchOperation, DispatchOutcome, DispatchResult, ExecutionBrokerAdapter
+from execution.dispatch import AttemptClaim, AttemptClaims, InMemoryAttemptClaims
+from execution.observations import (
+    ExecutionObservation, ObservationApplication, ObservationKind,
+    apply_dispatch_result, apply_execution_observation,
+)
 
 __all__ = [
+    "DispatchOperation", "DispatchOutcome", "DispatchResult", "ExecutionBrokerAdapter",
+    "AttemptClaim", "AttemptClaims", "InMemoryAttemptClaims", "ExecutionObservation",
+    "ObservationApplication", "ObservationKind", "apply_dispatch_result", "apply_execution_observation",
     "apply_broker_order_observation",
     "authorize_execution_order",
     "begin_submission",

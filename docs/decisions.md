@@ -496,3 +496,38 @@ Phase 3F 的 daily backtest 在真正到达 T+1 OPEN 时统一执行 risk evalua
 - `broker/` 保持 read-only market-data boundary，不增加 `placeOrder`、`cancelOrder`、order callbacks 或 query APIs。
 - IBKR adapter 和 identity mapping 延后到 Phase 3H；persistent repository、human approval workflow、Paper runner、automatic recovery、outstanding-order-aware planning、broker/local portfolio reconciliation、monitoring 和 alerts 延后到 Phase 3I。
 - 本决定不提供 Paper 或 Live Trading 授权，也不建立完整 OMS。
+
+## 2026-09-07：Phase 3H IBKR execution boundary / 执行边界
+
+### 决定 / Decision
+
+中文：采用 broker/ibkr 子包，将 ib-insync 0.9.86 原始 callback、合约和身份限制在 adapter 内。execution 增加中立 dispatch/result、一次性 claim 和显式观察规则。真实 transport 始终锁闭；专用 session 只支持显式只读 smoke。保留历史 connection/main.py 的行为。
+
+English: Use broker/ibkr to contain ib-insync 0.9.86 raw callbacks, contracts and identities. Add neutral dispatch/results, one-shot claims and explicit observation rules to execution. Real order transport remains locked; the dedicated session supports explicit read-only smoke only. Preserve historical connection/main.py behavior.
+
+### 原因与取舍 / Rationale and tradeoffs
+
+- 中文：仅检查 SUBMISSION_PENDING 不阻止两个调用者同时发送。共享内存 claim 按 ClientOrderId/operation 原子消费，绑定保存版本与请求；不提供 crash durability、数据库、lease 或 retry。
+- English: Checking SUBMISSION_PENDING alone does not stop concurrent senders. Shared memory claims atomically consume ClientOrderId/operation, binding the saved version/request, without crash durability, databases, leases or retries.
+- 中文：permId=0 保持未知；正 permId 才生成账户命名空间的 BrokerOrderId。完整 execId 派生稳定 ExecutionFillId，冲突不可覆盖。
+- English: permId=0 remains unknown; positive permId produces account-namespaced BrokerOrderId. Complete execId derives stable ExecutionFillId; conflicts cannot overwrite bindings.
+- 中文：ib_insync 高层状态可能本地合成，因此捕获原始 wrapper callback。broker Filled 不增加经济 quantity。等待真实佣金配对再生成 Fill，保留 trading.Fill 和回测不变。
+- English: ib_insync can synthesize high-level states, so capture raw wrapper callbacks. Broker Filled does not increase economic quantity. Wait for actual commission pairing before constructing Fill, preserving trading.Fill and backtest.
+- 中文：applied_at 与 execution_time 分离；撤单期间部分成交保持 CANCEL_PENDING；取消后迟到成交走专用 observation 校验，不开放任意 transition。
+- English: Separate applied_at from execution_time. Partial fills preserve CANCEL_PENDING; late cancelled executions use explicit observation validation, not arbitrary transitions.
+- 中文：旧 reconciliation API 保持签名和返回类型，取消直接写入累计数量的行为；broker quantity 仅为比较证据，ExecutionFill 是经济事实来源。UNKNOWN 的成交状态只有在已有匹配成交明细时才能确认，否则保持 UNKNOWN 并通过 reconcile_order 报告差异。
+- English: Keep the legacy reconciliation signature and return type while removing quantity writes. Broker quantities are comparison evidence; ExecutionFill is the economic source of truth. Fill-state observations resolve UNKNOWN only with matching accepted execution details; otherwise UNKNOWN remains and reconcile_order reports mismatches.
+- 中文：采用 prepare → revalidate → claim → side effect。准备失败或快照过期不消费 claim，也不分配 broker identity；claim 锁内重验完整保存快照，仍保证并发至多一次。消费后不 release、不 retry。
+- English: Use prepare → revalidate → claim → side effect. Failed/stale preparation consumes neither claim nor broker identity. Full saved-snapshot revalidation under the claim lock preserves concurrent at-most-once entry. Consumed claims have no release or retry.
+- 中文：UNKNOWN 保留所有已知成交与身份事实。CANCELLED 表示剩余未成交部分取消；迟到部分成交保持 CANCELLED，累计满额进入 FILLED，重复佣金不重复接受经济成交。
+- English: UNKNOWN preserves known execution and identity facts. CANCELLED cancels the unfilled remainder; late partial fills retain CANCELLED and complete fills become FILLED. Repeated commissions never cause duplicate economic acceptance.
+- 中文：端口、readonly 与账户前缀不能证明 Paper。真实发送没有可验证持久化/恢复基础，所以即使 opt-in 也保持锁闭；不以一次 Paper 下单证明工程正确性。
+- English: Port, readonly and account prefixes cannot prove Paper safety. Real dispatch lacks verified durability/recovery, so remains locked even with opt-in; one successful Paper order would not establish engineering correctness.
+
+### 后续 / Deferred
+
+中文：持久化、恢复、approval workflow、runner、未完成订单 planning、周期/组合 reconciliation、audit/monitoring 留给 Phase 3I。新版 CommissionAndFeesReport 仅是未来迁移事项，不修改本版经济模型。关键 API、安全 WHY 注释及 Phase 3H 文档必须双语可读。
+
+English: Persistence, recovery, approval workflow, a runner, outstanding-order planning, periodic/portfolio reconciliation and audit/monitoring remain Phase 3I. New CommissionAndFeesReport APIs are a future migration topic, not a change to current economics. Critical APIs, safety WHY comments and Phase 3H documents must remain bilingual.
+
+详细设计与依据 / Detailed design and sources: [IBKR execution foundation](ibkr_execution.md).

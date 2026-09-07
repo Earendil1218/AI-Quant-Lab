@@ -242,19 +242,35 @@ Phase 3G 在 planning 和 risk 之后增加 broker-neutral `execution` 边界。
 ```text
 strategy → planning → risk → authorization → execution lifecycle
                                                 ↓
-                                      future broker adapter
+                              IBKR Paper adapter foundation
 ```
 
 The included repository is deliberately in-memory and provides no crash or restart durability. Phase 3G does not connect to IBKR and provides no `placeOrder`, `cancelOrder`, Paper runner, persistent repository, automatic retry, or Live Trading capability.
 
 当前 repository 仅为内存实现，不提供 crash 或 restart durability。Phase 3G 不连接 IBKR，也不提供 `placeOrder`、`cancelOrder`、Paper runner、持久化 repository、自动重试或 Live Trading 能力。
 
+## Phase 3H — IBKR Paper Execution Adapter Foundation
+
+中文：发送遵循 prepare → revalidate → claim → side effect；准备失败不消费 claim 或 broker order ID。旧 reconciliation API 的 broker 累计数量也仅作比较证据，经济累计只由接受的 ExecutionFill 推进。UNKNOWN 保留已知事实；CANCELLED 表示剩余未成交部分取消，不意味着从未成交。
+
+English: Dispatch follows prepare → revalidate → claim → side effect; failed preparation consumes neither claim nor broker order ID. Broker cumulative quantities, including the legacy reconciliation API, are comparison evidence only; accepted ExecutionFill records alone advance economic totals. UNKNOWN preserves known facts. CANCELLED cancels the unfilled remainder and does not imply zero fills.
+
+中文：`broker/ibkr/` 已建立单一美股 MKT 映射、独立身份、提交/撤单边界、原始 callback 归一化、错误分类和 execution/commission 配对。`execution/` 提供进程内一次性 claim 及显式异步观察规则。broker Filled 不增加经济数量；只有费用完整的 ExecutionFill 可入账。关键实现提供中英文 docstring 与安全原因说明。
+
+English: `broker/ibkr/` provides single-US-equity MKT mapping, separate identities, submit/cancel boundaries, raw callback normalization, error translation and execution/commission pairing. `execution/` adds process-lifetime claims and explicit asynchronous observation rules. Broker Filled does not increase economic quantity; only fee-complete ExecutionFill records can be booked. Critical APIs and safety rationale are bilingual.
+
+**中文：真实订单 transport 始终锁闭；默认配置 DISABLED。内存 claim 没有 crash durability。Paper runner、人工审批 workflow、持久化/恢复、周期及组合 reconciliation、未完成订单感知 planning、自动重试、Live Trading 和期权执行均未实现。项目不能无人值守自动交易。**
+
+**English: Real order transport remains unconditionally locked; configuration defaults to DISABLED. In-memory claims have no crash durability. No Paper runner, approval workflow, persistence/recovery, periodic or portfolio reconciliation, outstanding-order-aware planning, automatic retry, Live Trading or options execution is implemented. This project is not ready for unattended trading.**
+
+只读 integration smoke 默认跳过；本阶段不以实际下单验收。 Read-only integration smoke is skipped by default; real orders are not an acceptance requirement. 详见 / See [IBKR execution architecture and limitations](docs/ibkr_execution.md).
+
 ## 安全边界 / Safety Boundary
 
 ### 中文
 
-项目当前仅允许 IBKR Paper Trading 的只读市场数据访问。代码不提交、修改或撤销订单。Paper Trading 自动执行和 Live Trading 都必须经过独立设计、安全审查与明确人工批准。
+项目当前真实 IBKR 通道只允许显式只读访问，订单 transport 锁闭。端口和 readonly 参数不是 Paper 证明；查询连接也必须核对配置与账户。Paper Trading 自动执行和 Live Trading 都必须经过独立设计、安全审查与明确人工批准。
 
 ### English
 
-The project currently permits only read-only market-data access through IBKR Paper Trading. It does not place, modify, or cancel orders. Automated paper execution and live trading require separate design, safety review, and explicit human approval.
+Real IBKR access remains explicitly read-only and order transport is locked. Neither a port nor the readonly argument proves Paper safety; the dedicated observation session validates configuration and accounts. Automated paper execution and live trading require separate design, safety review, and explicit human approval.

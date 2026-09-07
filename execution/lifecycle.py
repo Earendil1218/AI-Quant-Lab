@@ -134,9 +134,13 @@ def record_broker_rejection(
 
 
 def record_fill(
-    order: ExecutionOrder, execution_fill: ExecutionFill
+    order: ExecutionOrder, execution_fill: ExecutionFill, *, applied_at: datetime | None = None
 ) -> tuple[ExecutionOrder, bool]:
-    """Record a fill and flag whether accounting may apply it. / 记录成交并标记能否首次入账。"""
+    """Record a fill; acceptance is not a cross-store accounting transaction.
+
+    记录成交并标记首次接受；applied_at 为本地应用时间，经济成交时间保持原值。
+    applied_at separates delayed delivery from economic time; monotonicity remains enforced.
+    """
     if not isinstance(execution_fill, ExecutionFill):
         raise TypeError("execution_fill must be an ExecutionFill.")
     if execution_fill.client_order_id != order.client_order_id:
@@ -163,19 +167,27 @@ def record_fill(
         raise ValueError("fill instrument does not match the order request.")
     if fill.side is not order.request.side:
         raise ValueError("fill side does not match the order request.")
+    # 中文：旧 reconciliation 数量快照不是经济明细，不能再与逐笔成交相加。
+    # English: Legacy reconciliation quantity snapshots must not be added to economic executions.
+    if sum(existing.fill.quantity for existing in order.fills) != order.cumulative_filled_quantity:
+        raise ValueError("unresolved quantity snapshot requires reconciliation before economic fills.")
     cumulative = order.cumulative_filled_quantity + fill.quantity
     if cumulative > order.request.quantity:
         raise ValueError("fill would exceed the order quantity.")
     state = (
         ExecutionOrderState.FILLED
         if cumulative == order.request.quantity
-        else ExecutionOrderState.PARTIALLY_FILLED
+        else (ExecutionOrderState.CANCEL_PENDING
+              if order.state is ExecutionOrderState.CANCEL_PENDING
+              else ExecutionOrderState.PARTIALLY_FILLED)
     )
+    # 中文：部分成交不能丢失待撤意图；全部成交胜出。佣金延迟不改变经济时间。
+    # English: Preserve cancellation intent on partial fills; full execution wins.
     return (
         _advance(
             order,
             state,
-            fill.filled_at,
+            fill.filled_at if applied_at is None else applied_at,
             cumulative_filled_quantity=cumulative,
             fills=order.fills + (execution_fill,),
         ),
@@ -200,11 +212,18 @@ def record_cancelled(order: ExecutionOrder, cancelled_at: datetime) -> Execution
 def apply_broker_order_observation(
     order: ExecutionOrder, observation: BrokerOrderObservation
 ) -> ExecutionOrder:
-    """Resolve UNKNOWN from a broker-neutral observation. / 用券商中立观察收敛未知状态。"""
+    """Resolve UNKNOWN only using locally established economic facts.
+
+    券商累计快照仅供比较；经济累计只能由接受的 ExecutionFill 推进。
+    Broker quantities are comparison evidence, never a substitute for accepted ExecutionFill records.
+    """
     if not isinstance(observation, BrokerOrderObservation):
         raise TypeError("observation must be a BrokerOrderObservation.")
     if observation.client_order_id != order.client_order_id:
         raise ValueError("observation must bind the execution ClientOrderId.")
+    if (order.broker_order_id is not None and observation.broker_order_id is not None
+            and order.broker_order_id != observation.broker_order_id):
+        raise ValueError("observation conflicts with the bound BrokerOrderId.")
     if order.state is not ExecutionOrderState.UNKNOWN:
         same_identity = (
             observation.broker_order_id is None
@@ -242,12 +261,16 @@ def apply_broker_order_observation(
             raise ValueError("observation state and cumulative quantity disagree.")
         if observation.cumulative_filled_quantity > order.request.quantity:
             raise ValueError("observation would overfill the order.")
+        # 中文：缺失或冲突的经济明细保持 UNKNOWN，调用方用 reconcile_order 获取数量差异。
+        # English: Missing/conflicting execution evidence stays UNKNOWN; reconcile_order reports the mismatch.
+        if (observation.cumulative_filled_quantity != order.cumulative_filled_quantity
+                or sum(fill.fill.quantity for fill in order.fills) != order.cumulative_filled_quantity):
+            return order
         return _advance(
             order,
             observation.state,
             observation.observed_at,
-            broker_order_id=observation.broker_order_id,
-            cumulative_filled_quantity=observation.cumulative_filled_quantity,
+            broker_order_id=observation.broker_order_id or order.broker_order_id,
         )
     raise ValueError("observation cannot resolve UNKNOWN to the requested state.")
 

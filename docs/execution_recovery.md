@@ -2,9 +2,9 @@
 
 ## Scope / 范围
 
-中文：基线 v0.10 / Phase 3H 已合并；3I 为本地未提交实现。目标是在未来开放自动执行之前建立 restart-safe identity 和经济去重。本阶段真实 IBKR place/cancel 仍无条件锁闭；没有后台 runner、网络轮询、自动重连或自动重发。SQLite 文件只对应一个明确的执行/账户作用域，应用调用方串行化 dispatch、状态更新与规划。
+中文：基线 v0.10 / Phase 3H 已合并；3I 已通过 PR #10 合并（`574d1a5`）。目标是在未来开放自动执行之前建立 restart-safe identity 和经济去重。本阶段真实 IBKR place/cancel 仍无条件锁闭；没有后台 runner、网络轮询、自动重连或自动重发。SQLite 文件只对应一个明确的执行/账户作用域，应用调用方串行化 dispatch、状态更新与规划。
 
-English: Baseline v0.10 / Phase 3H is merged; 3I is a local uncommitted implementation. The goal is restart-safe identity and economic dedup before any future automated execution. Real IBKR place/cancel remain unconditionally locked. There is no background runner, network polling, automatic reconnect or resend. One SQLite file represents one execution/account scope; the caller serializes dispatch, state writes and planning.
+English: Baseline v0.10 / Phase 3H is merged; 3I is merged through PR #10 (`574d1a5`). The goal is restart-safe identity and economic dedup before any future automated execution. Real IBKR place/cancel remain unconditionally locked. There is no background runner, network polling, automatic reconnect or resend. One SQLite file represents one execution/account scope; the caller serializes dispatch, state writes and planning.
 
 ## Modules / 模块
 
@@ -110,3 +110,5 @@ Tests use tmp_path databases, fresh repository/session objects after determinist
 Verification adds 35 cases: the full suite is 537 passed / 0 failed / 1 skipped. Two real subprocess `os._exit` tests cover committed claim survival and fill-before-accounting recovery; fresh processes prove duplicate claim rejection and one-time booking. Five selected claim/identity/replay/version/freshness regressions each passed 50 fresh pytest runs (250 executions). These are process-crash tests, not machine-power-loss or multi-process coordination guarantees.
 
 中文：上述修复将未发布的 runner API 改为持久化一次性票据，在 prepare、dispatch、claim 校验 freshness；仅 broker 数量允许合法整股 float 转整数。身份双向唯一约束与 evidence 同事务；修正族按账户跨会话持久化，冲突保留原始批次且不改变经济状态。佣金等待仅按订单与 execution 精确解除，保留审计，不解除其他 UNKNOWN。记账采用 precision=50、ROUND_HALF_EVEN 与精度损失 trap，不按分自动舍入。两个真实子进程退出测试不构成断电或多进程协调保证。
+
+Phase 3J extends this existing evidence/transaction seam with read-only query reconciliation; see [IBKR reconciliation](ibkr_reconciliation.md). 3J 不改变已有 claim、Fill 或记账语义。

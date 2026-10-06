@@ -269,9 +269,9 @@ English: `broker/ibkr/` provides single-US-equity MKT mapping, separate identiti
 
 ## Phase 3I — Paper Trading Runner & Recovery Foundation
 
-中文：基线 v0.10 / Phase 3H 已合并（`d73308d` → PR #9 `6319e98`）。3I 在独立 feature branch 本地实现，等待人工 review，尚未 commit/merge；不宣称已发布新版本。标准库 SQLite 保存 execution aggregate、一次性 claim、成交去重、原始 callback 和记账标记。金额精确使用 Decimal；订单与成交身份同事务提交；记账缺口可在重启后显式补齐且不会重复扣款。恢复清单和纯 reconciliation 比较不会自动重发 UNKNOWN。薄 `application.PaperRunner` 只编排显式调用，阻止存在未完成执行、未决证据或记账缺口时的新规划。
+中文：基线 v0.10 / Phase 3H 已合并（`d73308d` → PR #9 `6319e98`）。3I 已通过 PR #10 合并，merge commit `574d1a5`；不宣称已发布新版本。标准库 SQLite 保存 execution aggregate、一次性 claim、成交去重、原始 callback 和记账标记。金额精确使用 Decimal；订单与成交身份同事务提交；记账缺口可在重启后显式补齐且不会重复扣款。恢复清单和纯 reconciliation 比较不会自动重发 UNKNOWN。薄 `application.PaperRunner` 只编排显式调用，阻止存在未完成执行、未决证据或记账缺口时的新规划。
 
-English: The baseline is v0.10 / merged Phase 3H (`d73308d` → PR #9 `6319e98`). Phase 3I is implemented locally on its feature branch awaiting human review, not committed/merged or released as a new version. Standard-library SQLite stores aggregates, one-shot claims, fill identities, raw callbacks and accounting markers. Decimal values remain exact; execution state and fill dedup commit together. Restart can explicitly complete an accounting gap without double booking. Recovery listings and pure reconciliation comparisons never resend UNKNOWN. The thin `application.PaperRunner` orchestrates explicit calls and blocks new planning while executions, unresolved evidence or accounting gaps remain.
+English: The baseline is v0.10 / merged Phase 3H (`d73308d` → PR #9 `6319e98`). Phase 3I is merged through PR #10 (`574d1a5`), without a new version release. Standard-library SQLite stores aggregates, one-shot claims, fill identities, raw callbacks and accounting markers. Decimal values remain exact; execution state and fill dedup commit together. Restart can explicitly complete an accounting gap without double booking. Recovery listings and pure reconciliation comparisons never resend UNKNOWN. The thin `application.PaperRunner` orchestrates explicit calls and blocks new planning while executions, unresolved evidence or accounting gaps remain.
 
 中文：这仍不是 autonomous live trading system。real-money trading、automatic UNKNOWN retry、full reconciliation loop、distributed execution、multi-process coordination、production HA 均不支持；Paper transport 仍 locked。在线只读 integration 尚无正式验收证据。与已接受成交匹配的佣金等待可定向解除并保留审计；其他未决证据保守保留，没有通用清除或人工审批 UI；详见 [持久化与恢复边界](docs/execution_recovery.md)。
 
@@ -287,5 +287,12 @@ English: This is not an autonomous live trading system. Real-money trading, auto
 
 Real IBKR access remains explicitly read-only and order transport is locked. Neither a port nor the readonly argument proves Paper safety; the dedicated observation session validates configuration and accounts. Automated paper execution and live trading require separate design, safety review, and explicit human approval.
 
-中文：3I 安全修复采用一次性 PlanningTicket 绑定组合 revision、计划和风险决策；SQLite v2 强制 broker identity 唯一归属、跨会话 correction-family 拒绝，并以固定 Decimal context 重建组合。修复仍待人工 review。
-English: The 3I pre-commit fixes bind a one-use PlanningTicket to portfolio revision, plan and risk decision. SQLite v2 enforces broker ownership and cross-session correction-family rejection; accounting uses a fixed Decimal context. These fixes await human review.
+中文：3I 安全修复采用一次性 PlanningTicket 绑定组合 revision、计划和风险决策；SQLite v2 强制 broker identity 唯一归属、跨会话 correction-family 拒绝，并以固定 Decimal context 重建组合。修复已随 Phase 3I 合并。
+English: The 3I pre-commit fixes bind a one-use PlanningTicket to portfolio revision, plan and risk decision. SQLite v2 enforces broker ownership and cross-session correction-family rejection; accounting uses a fixed Decimal context. These fixes are merged with Phase 3I.
+
+
+## Phase 3J — IBKR Paper Execution & Reconciliation Foundation
+
+中文：本地 feature branch 开发，未提交。增加显式只读 session、raw broker observation mapping、强身份 outstanding-order reconciliation 和 durable results。CONNECTED 不等于 READY；READY 不授予发送权限。MATCHED/BROKER_ONLY/LOCAL_ONLY/CONFLICT/UNKNOWN 均为证据判断，不自动修改订单、成交或持仓。未知、缺失和冲突保守阻断；没有自动 resend/retry。真实 place/cancel 仍锁闭，项目仍不是 live 或无人值守 Paper Trading system。版本保持 v0.10。
+
+English: Phase 3J adds explicit read-only sessions, neutral broker observations, strong-identity outstanding-order reconciliation and durable results. It is locally implemented and uncommitted. Connectivity is distinct from readiness; observations never authorize arbitrary local mutations. Real place/cancel remain locked, with no automatic resend, retry or background trading loop. See [IBKR reconciliation architecture and limits](docs/ibkr_reconciliation.md).

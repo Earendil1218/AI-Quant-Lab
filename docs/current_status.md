@@ -7,14 +7,14 @@
 ### 中文
 
 - 版本：AI Quant Lab v0.10
-- Roadmap：Phase 3I — Paper Trading Runner & Recovery Foundation（本地实现，未提交，待 review）
-- 基线状态：Phase 3H completed and merged，implementation `d73308d`，PR #9 merge `6319e98`；v0.10。下一阶段为 Phase 3I；在线只读 integration 尚无正式验收证据，真实订单 transport 仍 fail-closed。
+- Roadmap：Phase 3J — IBKR Paper Execution & Reconciliation Foundation（本地实现，未提交，待 review）
+- 基线状态：Phase 3H completed and merged，implementation `d73308d`，PR #9 merge `6319e98`；v0.10。Phase 3I 已通过 PR #10 合并（`574d1a5`），当前开发 Phase 3J；在线只读 integration 尚无正式验收证据，真实订单 transport 仍 fail-closed。
 
 ### English
 
 - Version: AI Quant Lab v0.10
-- Roadmap: Phase 3I — Paper Trading Runner & Recovery Foundation (implemented locally, uncommitted, awaiting review)
-- Baseline: Phase 3H completed and merged, implementation `d73308d`, PR #9 merge `6319e98`; v0.10. Phase 3I follows. Online read-only integration has no formal acceptance evidence; real order transport remains fail-closed.
+- Roadmap: Phase 3J — IBKR Paper Execution & Reconciliation Foundation (implemented locally, uncommitted, awaiting review)
+- Baseline: Phase 3H completed and merged, implementation `d73308d`, PR #9 merge `6319e98`; v0.10. Phase 3I is merged through PR #10 (`574d1a5`); Phase 3J is current local work. Online read-only integration has no formal acceptance evidence; real order transport remains fail-closed.
 
 ## 已完成 / Completed
 
@@ -206,9 +206,9 @@ English: Default fixtures block real network and IBKR order entrypoints; memory 
 
 ## Phase 3I / Persistent Execution and Recovery
 
-中文：在 `feature/phase-3i-paper-runner-recovery-foundation` 实现，尚未提交。新增 `infrastructure` 的 SQLite repository/claim、固定类型 JSON codec；`execution` 的纯恢复分类和快照核对；`broker/ibkr/recovery` 的身份与原始回调持久化；`application` 的薄 runner。订单版本、成交身份同事务保存；组合从已记账 Fill 重建，未记账成交可显式补记一次。故障测试覆盖 claim 前/后、transport 后、ack 后、execution/accounting 缺口、回调配对、事务回滚和并发 claim。
+中文：在 `feature/phase-3i-paper-runner-recovery-foundation` 实现，已通过 PR #10 合并。新增 `infrastructure` 的 SQLite repository/claim、固定类型 JSON codec；`execution` 的纯恢复分类和快照核对；`broker/ibkr/recovery` 的身份与原始回调持久化；`application` 的薄 runner。订单版本、成交身份同事务保存；组合从已记账 Fill 重建，未记账成交可显式补记一次。故障测试覆盖 claim 前/后、transport 后、ack 后、execution/accounting 缺口、回调配对、事务回滚和并发 claim。
 
-English: Implemented on `feature/phase-3i-paper-runner-recovery-foundation`, uncommitted. Adds SQLite repositories/claims and a fixed-type JSON codec in `infrastructure`, pure recovery classification and snapshot assessment in `execution`, durable identities/raw callbacks in `broker/ibkr/recovery`, and a thin `application` runner. Order versions and fill identities commit together. Portfolios rebuild from accounted fills; pending fills can be explicitly accounted once. Failure tests cover pre/post-claim, post-transport, post-ack, execution/accounting gaps, callback pairing, transaction rollback and concurrent claims.
+English: Implemented on `feature/phase-3i-paper-runner-recovery-foundation`, merged through PR #10. Adds SQLite repositories/claims and a fixed-type JSON codec in `infrastructure`, pure recovery classification and snapshot assessment in `execution`, durable identities/raw callbacks in `broker/ibkr/recovery`, and a thin `application` runner. Order versions and fill identities commit together. Portfolios rebuild from accounted fills; pending fills can be explicitly accounted once. Failure tests cover pre/post-claim, post-transport, post-ack, execution/accounting gaps, callback pairing, transaction rollback and concurrent claims.
 
 中文：仅与已接受 Fill 精确关联的佣金等待可定向解除并保留审计；其他未决证据不因普通 ack、成交或重启清除；没有人工清除 API。旧会话 callback 恢复只是证据恢复，不恢复连接或新 session 的发送权限。详见 [execution recovery](execution_recovery.md)。
 
@@ -216,14 +216,21 @@ English: Only commission waits correlated with accepted fills are resolved, reta
 
 ## 下一步 / Next
 
-1. 人工审查 Phase 3I implementation、故障测试和事务边界；尚未 commit/push/merge。
+1. 人工审查 Phase 3J observation/reconciliation 与故障测试；本阶段尚未 commit/push/merge。
 2. 后续独立设计未决证据处置、审批 workflow、在线只读核对、完整 planning/reconciliation 与监控；真实 transport 保持锁闭。
 3. Options、增量更新、分钟线时区和 corporate actions 继续作为独立能力设计。
 
-1. Review Phase 3I implementation, failure tests and transaction boundaries; no commit/push/merge has been performed.
+1. Review Phase 3J observation/reconciliation and failure tests; no Phase 3J commit/push/merge has been performed.
 2. Separately design unresolved-evidence resolution, approval workflows, online read-only verification, full planning/reconciliation and monitoring; keep real transport locked.
 3. Keep options, incremental updates, intraday timezone semantics, and corporate actions as separate capabilities.
 
 当前安全限制保持不变：broker 只允许只读市场数据访问；broker-neutral 模拟订单不会提交到 IBKR，不包含自动执行。
 
 The safety boundary is unchanged: broker access remains read-only; broker-neutral simulated orders are never submitted to IBKR and no automated execution is included.
+
+## Phase 3J / Current local development
+
+中文：显式只读 session、broker-neutral observations、保守强身份核对与持久化结果；真实 transport 保持锁闭。3I 合并基线为 537 passed / 1 skipped。新增能力和限制见 [IBKR reconciliation](ibkr_reconciliation.md)。
+English: Adds explicit read-only session orchestration, neutral observations, conservative identity matching and durable reconciliation evidence. The merged 3I baseline is 537 passed / 1 skipped; real transport remains locked.
+
+Phase 3J 本地验证 / Local validation: 591 passed / 0 failed / 1 skipped；新增 54 项离线测试。唯一 skip 为既有 opt-in IBKR readonly integration。内存 compile 104 个 Python 文件、import 69 个 production modules；没有在线验收。

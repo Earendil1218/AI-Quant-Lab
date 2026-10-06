@@ -30,8 +30,16 @@ class PaperRunner:
             raise ValueError("runner requires the same database's persistent adapter claims")
         self.repository = repository
         self.adapter = adapter
+        self._observation_session = None
 
     def _ready(self, *, dispatch_id=None):
+        if self._observation_session is not None:
+            from broker.ibkr.session import SessionState
+            if self._observation_session.state is not SessionState.READY:
+                raise ValueError("observation session is not ready")
+        from infrastructure.reconciliation import ReconciliationStore
+        if ReconciliationStore(self.repository).blocked():
+            raise ValueError("durable reconciliation evidence requires review")
         if (self.repository.unresolved_observations() or self.repository.pending_accounting_count()
                 or self.repository.pending_inbox_count()):
             raise ValueError("unresolved evidence/accounting requires recovery review")
@@ -122,3 +130,27 @@ class PaperRunner:
 
     def account_pending(self):
         return self.repository.account_pending()
+
+    def reconcile_session(self, session, *, integration_opt_in: bool = False):
+        """Explicit connect/query/reconcile; never dispatch or repair local facts.
+
+        启动/重连核对仅编排；失败持久化并降级，绝不自动重发或清除 UNKNOWN。
+        """
+        from broker.ibkr.observation import owned_identities
+        from infrastructure.reconciliation import ReconciliationStore
+
+        store = ReconciliationStore(self.repository)
+        self._observation_session = session
+        try:
+            session.connect(integration_opt_in=integration_opt_in)
+            snapshot = session.observe()
+            report = store.reconcile(snapshot, owned_identities)
+            blocked = (store.blocked() or bool(self.repository.unresolved_observations())
+                       or self.repository.pending_accounting_count() > 0
+                       or self.repository.pending_inbox_count() > 0)
+            session.reconciled(report, blocked=blocked)
+            return report
+        except Exception:
+            session.degrade()
+            store.failure(session.generation, "SESSION_OR_RECONCILIATION_FAILED")
+            raise

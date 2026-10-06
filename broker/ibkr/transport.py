@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 from queue import Empty, SimpleQueue
-from typing import Protocol
+from typing import Protocol, TYPE_CHECKING
 from uuid import uuid4
 
 from ib_insync import IB, Contract, Order
@@ -13,6 +13,9 @@ from ib_insync.wrapper import Wrapper
 
 from broker.ibkr.config import PaperExecutionConfig, PaperSafetyError
 from broker.ibkr.models import CommissionEvent, ErrorEvent, ExecutionEvent, OpenOrderEvent, SessionEvent, StatusEvent
+
+if TYPE_CHECKING:
+    from broker.ibkr.observation import RawBrokerSnapshot
 
 
 RawEvent = OpenOrderEvent | StatusEvent | ExecutionEvent | CommissionEvent | ErrorEvent | SessionEvent
@@ -131,6 +134,7 @@ class ReadOnlyIBKRTransport:
         self._ib.disconnectedEvent += self._on_disconnected
         self._valid = False
         self._connected_once = False
+        self._query_started = False
 
     def _on_disconnected(self) -> None:
         self._valid = False
@@ -165,6 +169,38 @@ class ReadOnlyIBKRTransport:
     def preflight(self) -> None:
         """Always fail closed for real orders in this foundation. / 本阶段真实订单始终锁闭。"""
         raise PaperSafetyError("Phase 3H real order transport is locked: no crash-durable execution/recovery.")
+
+    def query_snapshot(self) -> "RawBrokerSnapshot":
+        """One explicit bounded read-only query; retain raw callbacks for audit.
+
+        只查询、不绑定/接管订单；原始队列不清空。查询完成不保证历史 execution 全量可见。
+        """
+        from broker.ibkr.observation import RawBrokerSnapshot
+        from ib_insync import ExecutionFilter
+
+        self.config.validate(side_effect=False)
+        self.evidence().validate(self.config, self.generation)
+        if self._query_started:
+            raise PaperSafetyError("use a fresh observation session for another query")
+        self._query_started = True
+        # Keep pre-query callbacks for ingestion, but never present them as current
+        # open-order query results. / 历史队列保留，不冒充本次 broker 查询结果。
+        prior = self.read_events()
+        try:
+            self._ib.RequestTimeout = 10
+            self._ib.reqAllOpenOrders()
+            self._ib.reqExecutions(ExecutionFilter(acctCode=self.config.account))
+            self.evidence().validate(self.config, self.generation)
+        finally:
+            events = self.read_events()
+            for event in (*prior, *events):
+                self._events.put(event)
+        uncertain = any(isinstance(e, (ErrorEvent, SessionEvent)) for e in events)
+        return RawBrokerSnapshot(str(uuid4()), self.generation, self.config.account, datetime.now(timezone.utc),
+                                 tuple(e for e in events if isinstance(e, OpenOrderEvent)),
+                                 tuple(e for e in events if isinstance(e, StatusEvent)),
+                                 tuple(e for e in events if isinstance(e, ExecutionEvent)),
+                                 not uncertain, "QUERY_DIAGNOSTIC" if uncertain else "")
 
     def qualify(self, contract: Contract) -> tuple[Contract, ...]:
         """Query a contract only in an explicitly opened session. / 仅在显式连接内查询合约。"""

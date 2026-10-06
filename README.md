@@ -72,7 +72,7 @@ date, open, high, low, close, volume
 AI-Quant-Lab/
 ├── main.py              # End-to-end historical data pipeline
 ├── config/              # Environment and path configuration
-├── broker/              # Read-only IBKR connection and market data access
+├── broker/              # Read-only market data; ibkr/ execution adapter with locked transport
 ├── data/
 │   ├── validation.py    # Data-quality rules
 │   ├── processing.py    # Deterministic market-data normalization
@@ -89,7 +89,9 @@ AI-Quant-Lab/
 ├── portfolio/           # Sizing, target reconciliation, and fill accounting
 ├── backtest/            # Deterministic daily simulation and analytics view
 ├── risk/                # Broker-neutral deterministic pre-trade risk controls
-└── execution/           # Broker-neutral identity, authorization, and lifecycle state
+├── execution/           # Broker-neutral identity, lifecycle, recovery and reconciliation
+├── infrastructure/      # SQLite execution repository, durable claims and fill accounting
+└── application/         # Explicit offline Paper runner orchestration
 ```
 
 ## 运行环境 / Requirements
@@ -259,11 +261,21 @@ English: Dispatch follows prepare → revalidate → claim → side effect; fail
 
 English: `broker/ibkr/` provides single-US-equity MKT mapping, separate identities, submit/cancel boundaries, raw callback normalization, error translation and execution/commission pairing. `execution/` adds process-lifetime claims and explicit asynchronous observation rules. Broker Filled does not increase economic quantity; only fee-complete ExecutionFill records can be booked. Critical APIs and safety rationale are bilingual.
 
-**中文：真实订单 transport 始终锁闭；默认配置 DISABLED。内存 claim 没有 crash durability。Paper runner、人工审批 workflow、持久化/恢复、周期及组合 reconciliation、未完成订单感知 planning、自动重试、Live Trading 和期权执行均未实现。项目不能无人值守自动交易。**
+**中文：真实订单 transport 始终锁闭；默认配置 DISABLED。3H 内存 claim 没有 crash durability；3I 的 SQLite 替代实现及最小离线 runner 见下文。人工审批 workflow、周期及组合 reconciliation、自动重试、Live Trading 和期权执行均未实现。项目不能无人值守自动交易。**
 
-**English: Real order transport remains unconditionally locked; configuration defaults to DISABLED. In-memory claims have no crash durability. No Paper runner, approval workflow, persistence/recovery, periodic or portfolio reconciliation, outstanding-order-aware planning, automatic retry, Live Trading or options execution is implemented. This project is not ready for unattended trading.**
+**English: Real order transport remains unconditionally locked; configuration defaults to DISABLED. The 3H memory claims have no crash durability; see the 3I SQLite alternative and minimal offline runner below. Approval workflows, periodic/portfolio reconciliation, automatic retry, live trading and options execution remain unimplemented. This project is not ready for unattended trading.**
 
 只读 integration smoke 默认跳过；本阶段不以实际下单验收。 Read-only integration smoke is skipped by default; real orders are not an acceptance requirement. 详见 / See [IBKR execution architecture and limitations](docs/ibkr_execution.md).
+
+## Phase 3I — Paper Trading Runner & Recovery Foundation
+
+中文：基线 v0.10 / Phase 3H 已合并（`d73308d` → PR #9 `6319e98`）。3I 在独立 feature branch 本地实现，等待人工 review，尚未 commit/merge；不宣称已发布新版本。标准库 SQLite 保存 execution aggregate、一次性 claim、成交去重、原始 callback 和记账标记。金额精确使用 Decimal；订单与成交身份同事务提交；记账缺口可在重启后显式补齐且不会重复扣款。恢复清单和纯 reconciliation 比较不会自动重发 UNKNOWN。薄 `application.PaperRunner` 只编排显式调用，阻止存在未完成执行、未决证据或记账缺口时的新规划。
+
+English: The baseline is v0.10 / merged Phase 3H (`d73308d` → PR #9 `6319e98`). Phase 3I is implemented locally on its feature branch awaiting human review, not committed/merged or released as a new version. Standard-library SQLite stores aggregates, one-shot claims, fill identities, raw callbacks and accounting markers. Decimal values remain exact; execution state and fill dedup commit together. Restart can explicitly complete an accounting gap without double booking. Recovery listings and pure reconciliation comparisons never resend UNKNOWN. The thin `application.PaperRunner` orchestrates explicit calls and blocks new planning while executions, unresolved evidence or accounting gaps remain.
+
+中文：这仍不是 autonomous live trading system。real-money trading、automatic UNKNOWN retry、full reconciliation loop、distributed execution、multi-process coordination、production HA 均不支持；Paper transport 仍 locked。在线只读 integration 尚无正式验收证据。与已接受成交匹配的佣金等待可定向解除并保留审计；其他未决证据保守保留，没有通用清除或人工审批 UI；详见 [持久化与恢复边界](docs/execution_recovery.md)。
+
+English: This is not an autonomous live trading system. Real-money trading, automatic UNKNOWN retry, a full reconciliation loop, distributed execution, multi-process coordination and production HA are unsupported; Paper transport remains locked. Online read-only integration has no formal acceptance evidence. Commission waits matching accepted fills are resolved with audit retention; other uncertainty is conservatively retained without blanket clearing or an approval UI. See [persistence and recovery boundaries](docs/execution_recovery.md).
 
 ## 安全边界 / Safety Boundary
 
@@ -274,3 +286,6 @@ English: `broker/ibkr/` provides single-US-equity MKT mapping, separate identiti
 ### English
 
 Real IBKR access remains explicitly read-only and order transport is locked. Neither a port nor the readonly argument proves Paper safety; the dedicated observation session validates configuration and accounts. Automated paper execution and live trading require separate design, safety review, and explicit human approval.
+
+中文：3I 安全修复采用一次性 PlanningTicket 绑定组合 revision、计划和风险决策；SQLite v2 强制 broker identity 唯一归属、跨会话 correction-family 拒绝，并以固定 Decimal context 重建组合。修复仍待人工 review。
+English: The 3I pre-commit fixes bind a one-use PlanningTicket to portfolio revision, plan and risk decision. SQLite v2 enforces broker ownership and cross-session correction-family rejection; accounting uses a fixed Decimal context. These fixes await human review.

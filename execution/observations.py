@@ -7,7 +7,7 @@ from enum import Enum
 from execution.adapter import DispatchOutcome, DispatchResult
 from execution.lifecycle import _advance, record_fill
 from execution.models import (
-    BrokerOrderId, BrokerRejection, ClientOrderId, ExecutionFill,
+    BrokerExecutionId, BrokerOrderId, BrokerRejection, ClientOrderId, ExecutionFill,
     ExecutionOrder, ExecutionOrderState as State, TERMINAL_EXECUTION_STATES,
 )
 from trading import OrderRequest
@@ -46,8 +46,13 @@ class ExecutionObservation:
     reported_filled_quantity: int | None = None
     execution_fill: ExecutionFill | None = None
     detail: str = ""
+    pending_execution_id: BrokerExecutionId | None = None
 
     def __post_init__(self) -> None:
+        if self.pending_execution_id is not None:
+            if (self.kind is not ObservationKind.EXECUTION_PENDING
+                    or not isinstance(self.pending_execution_id, BrokerExecutionId)):
+                raise ValueError("pending execution correlation requires EXECUTION_PENDING and typed identity")
         if not isinstance(self.client_order_id, ClientOrderId) or not isinstance(self.request, OrderRequest):
             raise TypeError("observation requires typed identity and request.")
         if not isinstance(self.kind, ObservationKind) or not isinstance(self.observed_at, datetime):

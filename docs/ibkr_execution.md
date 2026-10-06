@@ -1,5 +1,9 @@
 # Phase 3H — IBKR Paper Execution Adapter Foundation
 
+中文：本页记录已合并的 3H 基线及其内存实现限制。3I 新增 SQLite 替代实现、旧会话证据恢复与最小离线 runner，见 [execution recovery](execution_recovery.md)；原有内存类和真实 transport 锁保持不变。
+
+English: This page describes the merged 3H baseline and its memory implementations. Phase 3I adds SQLite alternatives, old-session evidence recovery and a minimal offline runner; see [execution recovery](execution_recovery.md). Existing memory classes and the real transport lock remain unchanged.
+
 ## 范围 / Scope
 
 中文：本阶段建立离线可验证的 execution boundary，不是 Paper runner。`trading.Fill`、回测、risk、portfolio 和 strategy 保持隔离。真实 `ReadOnlyIBKRTransport.place/cancel` **始终拒绝**，即使配置 opt-in；目前只有 fake transport 可以验证发送边界。内存 repository/claim 没有 crash durability，账户 API 也不提供本项目可依赖的统一 Paper 证明，因此不能宣称 unattended、restart-safe 或 Live-ready。

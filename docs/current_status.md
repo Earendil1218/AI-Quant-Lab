@@ -1,20 +1,20 @@
 # 当前项目状态 / Current Project Status
 
-最后更新 / Last updated: 2026-09-07
+最后更新 / Last updated: 2026-10-06
 
 ## 当前里程碑 / Current Milestone
 
 ### 中文
 
 - 版本：AI Quant Lab v0.10
-- Roadmap：Phase 3H — IBKR Paper Execution Adapter Foundation
-- 状态：Phase 3A–3G 已合并（3G / PR #8）；Phase 3H 已在 feature branch 实现，尚未提交，等待代码和架构审查
+- Roadmap：Phase 3I — Paper Trading Runner & Recovery Foundation（本地实现，未提交，待 review）
+- 基线状态：Phase 3H completed and merged，implementation `d73308d`，PR #9 merge `6319e98`；v0.10。下一阶段为 Phase 3I；在线只读 integration 尚无正式验收证据，真实订单 transport 仍 fail-closed。
 
 ### English
 
 - Version: AI Quant Lab v0.10
-- Roadmap: Phase 3H — IBKR Paper Execution Adapter Foundation
-- Status: Phases 3A–3G are merged (3G / PR #8); Phase 3H is implemented on its feature branch, uncommitted and awaiting code/architecture review
+- Roadmap: Phase 3I — Paper Trading Runner & Recovery Foundation (implemented locally, uncommitted, awaiting review)
+- Baseline: Phase 3H completed and merged, implementation `d73308d`, PR #9 merge `6319e98`; v0.10. Phase 3I follows. Online read-only integration has no formal acceptance evidence; real order transport remains fail-closed.
 
 ## 已完成 / Completed
 
@@ -58,7 +58,7 @@
 
 ### 中文
 
-- 449 项离线测试通过，1 项只读 integration 默认 SKIPPED。修复前为 437 项，本轮新增 12 项并更新相关既有断言；相对 Phase 3G 的 331 项共新增 118 项离线测试。撤单及 reconciliation 断言按批准语义更新。
+- Phase 3H 基线为 449 passed / 1 skipped；Phase 3I 全量离线测试为 537 passed / 0 failed / 1 skipped，较 3H 新增 88 项（本轮安全修复新增 35 项）。只读 integration 仍 opt-in，本轮未运行在线验证。
 - processing、validation、raw/processed path 和 CSV round-trip 均由固定输入或 pytest 临时目录验证。
 - 测试不连接真实 TWS，不写入项目数据目录，也不调用订单接口。
 - Phase 2 曾由用户人工在线验证：成功获取、验证、保存并重载 251 条 NVDA 日线数据。
@@ -66,7 +66,7 @@
 
 ### English
 
-- 449 offline tests pass; 1 read-only integration test is SKIPPED by default. The pre-fix count was 437; this fix adds 12 cases and updates affected assertions, totaling 118 new offline cases over Phase 3G's 331. Cancellation and reconciliation assertions follow the approved semantics.
+- Phase 3H baseline: 449 passed / 1 skipped. Phase 3I full offline suite: 537 passed / 0 failed / 1 skipped, adding 88 cases since 3H (35 safety-fix cases this round). Read-only integration remains opt-in; no online verification was performed.
 - Processing, validation, raw/processed paths, and CSV round trips use deterministic inputs or pytest temporary directories.
 - Tests do not connect to TWS, write to project data directories, or invoke order APIs.
 - Phase 2 was previously verified manually online with 251 NVDA daily bars fetched, validated, saved, and reloaded.
@@ -175,7 +175,7 @@
 - 尚未设计多交易所 calendar policy。
 - 当前 backtest 仅支持 single-equity、daily、long/flat、fixed quantity、next-open execution；尚未实现 Options、Greeks 或 advanced portfolio risk。
 - 不支持自动化 Paper Trading 或 Live Trading。
-- IBKR adapter 已离线实现，真实订单 transport 仍锁闭；persistent execution repository、human approval workflow、automatic retry/restart recovery、Paper runner、outstanding-order-aware planning、broker/local portfolio reconciliation、monitoring、alerts 或 OMS 均未实现。
+- IBKR adapter 真实订单 transport 仍锁闭。3I 提供 SQLite repository/claim、显式恢复、成交重放与最小离线 runner；未完成订单会阻止新规划，但不提供净额调整或完整 outstanding-order-aware planning。human approval workflow、automatic retry、broker/local portfolio reconciliation、monitoring、alerts 和 OMS 未实现。
 - fake 已覆盖连接、qualification 和错误边界；Phase 3H 尚未进行在线验证。
 
 ### English
@@ -187,7 +187,7 @@
 - No multi-exchange calendar policy has been designed.
 - Backtesting is limited to single-equity, daily, long/flat, fixed-quantity, next-open execution; options, Greeks, and advanced portfolio risk are not implemented.
 - Automated paper trading and live trading are not supported.
-- The adapter is verified offline and real order transport is locked. Durable execution persistence, human approval workflow, automatic retry/restart recovery, a Paper runner, outstanding-order-aware planning, broker/local portfolio reconciliation, monitoring, alerts, and an OMS are not implemented.
+- Real order transport remains locked. Phase 3I provides SQLite repositories/claims, explicit recovery, fill replay and a minimal offline runner. Outstanding executions block new planning; there is no netting or full outstanding-order-aware planner. Approval workflows, automatic retry, broker/local portfolio reconciliation, monitoring, alerts and an OMS are not implemented.
 - Fake transport covers connection, qualification and error boundaries; Phase 3H has not been verified online.
 
 ## Phase 3H / IBKR Paper Execution Adapter Foundation
@@ -204,14 +204,24 @@ English: Implemented broker/ibkr mapping, separate identities, submit/cancel bou
 
 English: Default fixtures block real network and IBKR order entrypoints; memory claims provide no crash durability. The dedicated read-only smoke requires opt-in and has not run online. Critical APIs, safety rationale and Phase 3H documents are bilingual. See [IBKR execution](ibkr_execution.md).
 
+## Phase 3I / Persistent Execution and Recovery
+
+中文：在 `feature/phase-3i-paper-runner-recovery-foundation` 实现，尚未提交。新增 `infrastructure` 的 SQLite repository/claim、固定类型 JSON codec；`execution` 的纯恢复分类和快照核对；`broker/ibkr/recovery` 的身份与原始回调持久化；`application` 的薄 runner。订单版本、成交身份同事务保存；组合从已记账 Fill 重建，未记账成交可显式补记一次。故障测试覆盖 claim 前/后、transport 后、ack 后、execution/accounting 缺口、回调配对、事务回滚和并发 claim。
+
+English: Implemented on `feature/phase-3i-paper-runner-recovery-foundation`, uncommitted. Adds SQLite repositories/claims and a fixed-type JSON codec in `infrastructure`, pure recovery classification and snapshot assessment in `execution`, durable identities/raw callbacks in `broker/ibkr/recovery`, and a thin `application` runner. Order versions and fill identities commit together. Portfolios rebuild from accounted fills; pending fills can be explicitly accounted once. Failure tests cover pre/post-claim, post-transport, post-ack, execution/accounting gaps, callback pairing, transaction rollback and concurrent claims.
+
+中文：仅与已接受 Fill 精确关联的佣金等待可定向解除并保留审计；其他未决证据不因普通 ack、成交或重启清除；没有人工清除 API。旧会话 callback 恢复只是证据恢复，不恢复连接或新 session 的发送权限。详见 [execution recovery](execution_recovery.md)。
+
+English: Only commission waits correlated with accepted fills are resolved, retaining audit records. True UNKNOWN, connection loss and other uncertainty remain latched across acknowledgements, fills and restarts; no manual-clear API is provided. Old-session callback recovery restores evidence only, not connections or dispatch authority in a new session. See [execution recovery](execution_recovery.md).
+
 ## 下一步 / Next
 
-1. 人工审查 Phase 3H implementation、tests 和安全边界；未经授权不 commit/push/merge。
-2. Phase 3I — Paper Trading Runner & Recovery Foundation 单独设计持久化、恢复、显式审批、runner、未完成订单 planning 和 reconciliation。
+1. 人工审查 Phase 3I implementation、故障测试和事务边界；尚未 commit/push/merge。
+2. 后续独立设计未决证据处置、审批 workflow、在线只读核对、完整 planning/reconciliation 与监控；真实 transport 保持锁闭。
 3. Options、增量更新、分钟线时区和 corporate actions 继续作为独立能力设计。
 
-1. Review Phase 3H implementation, tests, and safety boundaries; do not commit, push, or merge without authorization.
-2. Design Phase 3I — Paper Trading Runner & Recovery Foundation separately: persistence, recovery, explicit approval, runner, outstanding-order planning and reconciliation.
+1. Review Phase 3I implementation, failure tests and transaction boundaries; no commit/push/merge has been performed.
+2. Separately design unresolved-evidence resolution, approval workflows, online read-only verification, full planning/reconciliation and monitoring; keep real transport locked.
 3. Keep options, incremental updates, intraday timezone semantics, and corporate actions as separate capabilities.
 
 当前安全限制保持不变：broker 只允许只读市场数据访问；broker-neutral 模拟订单不会提交到 IBKR，不包含自动执行。

@@ -204,15 +204,15 @@ Completion: a single-equity daily long/flat strategy produces deterministic orde
 
 ### Phase 3H — IBKR Paper Execution Adapter Foundation
 
-中文：已在 feature branch 实现并离线验证，尚未提交，等待审查。包括单一美股 MKT 映射、身份分离、一次性 claim、submit/cancel boundary、raw callbacks、错误归一化、execution/commission pairing。真实订单 transport 始终锁闭；内存 repository/claim 不提供 crash durability；不以实际下单验收。
+中文：Phase 3H 已完成并合并；implementation `d73308d`，PR #9 merge `6319e98`，基线 v0.10。包括单一美股 MKT 映射、身份分离、一次性 claim、submit/cancel boundary、raw callbacks、错误归一化、execution/commission pairing。真实订单 transport 始终锁闭；3H 内存 repository/claim 不提供 crash durability；在线只读 integration 尚无正式验收证据。
 
-English: Implemented and verified offline on the feature branch, uncommitted and awaiting review. Includes single-US-equity MKT mapping, separate identities, one-shot claims, submit/cancel boundaries, raw callbacks, error normalization and execution/commission pairing. Real order transport stays locked. Memory stores are not crash-durable; actual orders are not an acceptance requirement.
+English: Phase 3H completed and merged: implementation `d73308d`, PR #9 merge `6319e98`, baseline v0.10. Includes single-US-equity MKT mapping, separate identities, one-shot claims, submit/cancel boundaries, raw callbacks, error normalization and execution/commission pairing. Real order transport stays locked. The 3H memory stores are not crash-durable; online read-only integration has no formal acceptance evidence.
 
 ### Phase 3I — Paper Trading Runner & Recovery Foundation
 
-中文：候选范围为生产持久化 execution repository、restart recovery、显式人工审批、Paper runner、未完成订单感知 planning、周期 reconciliation、broker/local portfolio reconciliation、audit trail、operational monitoring 和 alerts。必须先设计可验证的 Paper 账户证明、状态/会计事务和安全恢复，才能考虑解锁真实 Paper transport。自动 retry/resubmission 不得绕过 UNKNOWN 或重复订单保护。Live Trading、options execution 不自动纳入本阶段。
+中文：已在独立 feature branch 本地实现，未提交、待 review。当前范围为 SQLite execution repository、持久化 claim、成交去重、记账恢复、callback inbox/身份恢复、纯 reconciliation 比较和最小显式离线 runner。claim 后不确定性要求核对，绝不自动重发。未决证据保守阻断规划；真实 Paper transport 继续锁闭。完整人工审批 workflow、周期/组合 reconciliation、审计运营系统、监控和 alerts 留待独立阶段；不包含 Live Trading、options execution、多进程协调或 HA。
 
-English: Candidates include production persistence, restart recovery, explicit approval, a Paper runner, outstanding-order-aware planning, periodic reconciliation, broker/local portfolio reconciliation, audit trails, monitoring and alerts. Verified Paper-account evidence, state/accounting transactions and safe recovery must precede unlocking real Paper transport. Automatic retry/resubmission must not bypass UNKNOWN or duplicate-order protection. Live Trading and options execution are not implicitly included.
+English: Implemented locally on its feature branch, uncommitted and awaiting review. Current scope is SQLite execution storage, durable claims, fill dedup/accounting recovery, callback inbox/identity recovery, pure reconciliation assessment and minimal explicit offline runner orchestration. Post-claim uncertainty requires reconciliation, never automatic resend. Unresolved evidence blocks planning; real Paper transport stays locked. Full approval workflows, periodic/portfolio reconciliation, operational auditing, monitoring and alerts remain separate work. Live trading, options execution, multi-process coordination and HA are excluded.
 
 ## Phase 4+：Options Capability Track / 期权能力主线
 

@@ -52,7 +52,7 @@ trading domain → sizing → portfolio planning → pre-trade risk
 - `backtest` 编排历史 daily event lifecycle 和模拟执行，不依赖 IBKR。
 - `risk` 负责 broker-neutral、确定性的交易前限制；风险通过不等于人工批准、提交授权、broker acknowledgement 或成交。
 - `execution` 负责 broker-neutral client identity、显式提交授权、提交状态、幂等、broker observations 和 reconciliation-friendly local state；它不包含具体 broker I/O。
-- Phase 3G 的 in-memory repository 只服务离线开发，不提供 crash/restart durability；持久化、人工审批编排和 Paper runner 属于 Phase 3I。
+- Phase 3G 的 in-memory repository 只服务离线开发，不提供 crash/restart durability；Phase 3I 的 `infrastructure` 提供 SQLite 替代实现，`application` 提供显式离线 runner。人工审批 workflow 和自动交易仍未实现。
 - 应用入口负责组合各模块，不把底层实现细节重新写入主流程。
 
 上层可以依赖下层提供的稳定接口；底层模块不应反向承担应用编排职责。
@@ -68,6 +68,12 @@ English: broker/ibkr owns a dedicated read-only session, raw callbacks, identiti
 English: ClientOrderId, API orderId, permId and execId remain separate. Broker completion is separate from economic execution; immutable fills require execution and actual commission pairing. Local application time is distinct from economic time. Backtests do not traverse this network lifecycle or depend on IBKR. Persistence, recovery, approval workflow, a Paper runner, periodic/portfolio reconciliation and monitoring belong to Phase 3I; Live Trading remains out of scope.
 
 详细设计 / Detailed design: [IBKR execution foundation](ibkr_execution.md).
+
+### Phase 3I 持久化与应用边界 / Persistence and Application Boundary
+
+中文：`infrastructure` 实现 SQLite repository、持久化 claim 和 Fill 记账标记；domain 不导入 sqlite。`application.PaperRunner` 委托 planning/risk/lifecycle，只做显式编排，不提供后台循环。恢复旧会话身份和 callback 位于 `broker/ibkr/recovery.py`。真实 transport 继续锁闭；UNKNOWN 与 claim 后崩溃均禁止自动重发。当前为单进程、串行应用作用域，详见 [execution recovery](execution_recovery.md)。
+
+English: `infrastructure` implements SQLite repositories, durable claims and fill-accounting markers; domain never imports sqlite. `application.PaperRunner` delegates planning/risk/lifecycle through explicit calls without a background loop. Old-session identity/callback reconstruction stays in `broker/ibkr/recovery.py`. Real transport remains locked; UNKNOWN and post-claim crashes never permit automatic resend. This is a single-process, serialized application scope; see [execution recovery](execution_recovery.md).
 
 ## 核心技术栈
 

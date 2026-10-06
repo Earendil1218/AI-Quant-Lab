@@ -7,9 +7,11 @@ from broker.ibkr.events import IBKREventNormalizer
 from broker.ibkr.mapping import EquityContractSpec
 from broker.ibkr.models import IBKROrderIdentity, IdentityRegistry
 from broker.ibkr.transport import ReadOnlyIBKRTransport
+from broker.ibkr.recovery import PersistentIdentityRegistry, PersistentIBKRInbox
 
 __all__ = [
     "IBKRPaperAdapter", "PaperExecutionConfig", "PaperSafetyError", "paper_observation_session",
     "IBKREventNormalizer", "EquityContractSpec", "IBKROrderIdentity", "IdentityRegistry",
     "ReadOnlyIBKRTransport",
+    "PersistentIdentityRegistry", "PersistentIBKRInbox",
 ]

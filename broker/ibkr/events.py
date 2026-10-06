@@ -71,7 +71,8 @@ class IBKREventNormalizer:
                 or event.order_ref != binding.identity.client_order_id.value):
             raise ValueError("openOrder request/contract correlation mismatch.")
         binding = self.registry.resolve(event.generation, event.client_id, event.order_id, event.perm_id, event.account)
-        kind = {"Submitted": Kind.WORKING, "Filled": Kind.COMPLETION,
+        kind = {"ApiPending": Kind.PENDING, "PendingSubmit": Kind.PENDING,
+                "PreSubmitted": Kind.HELD, "Submitted": Kind.WORKING, "Filled": Kind.COMPLETION,
                 "Cancelled": Kind.CANCELLED, "ApiCancelled": Kind.CANCELLED,
                 "PendingCancel": Kind.CANCEL_PENDING}.get(event.status, Kind.UNRESOLVED)
         return self._observation(binding, kind, event.observed_at, detail=f"broker open order: {event.status}")

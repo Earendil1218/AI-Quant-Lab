@@ -31,8 +31,15 @@ class PaperRunner:
         self.repository = repository
         self.adapter = adapter
         self._observation_session = None
+        self._execution_transport = None
 
     def _ready(self, *, dispatch_id=None):
+        if self._execution_transport is not None:
+            self._execution_transport._session_preflight()
+            if self._execution_transport.has_pending_callbacks:
+                raise ValueError("pending raw callbacks require ingestion")
+        elif hasattr(self.adapter.transport, "_dispatch_scope"):
+            raise ValueError("Paper execution session requires explicit startup reconciliation")
         if self._observation_session is not None:
             from broker.ibkr.session import SessionState
             if self._observation_session.state is not SessionState.READY:
@@ -153,4 +160,75 @@ class PaperRunner:
         except Exception:
             session.degrade()
             store.failure(session.generation, "SESSION_OR_RECONCILIATION_FAILED")
+            raise
+
+    def start_paper_session(self, confirmation, *, integration_opt_in=False,
+                            side_effect_opt_in=False):
+        """Explicit connect followed by fresh reconciliation; never plan or send.
+
+        Caller authority and broker facts remain distinct; failures block further work.
+        """
+        from broker.ibkr.paper_transport import PaperExecutionTransport
+        transport = self.adapter.transport
+        if not isinstance(transport, PaperExecutionTransport):
+            raise ValueError("explicit Paper execution transport required")
+        self._execution_transport = transport
+        try:
+            transport.connect_paper(confirmation, integration_opt_in=integration_opt_in,
+                                    side_effect_opt_in=side_effect_opt_in)
+            return self.reconcile_paper()
+        except Exception:
+            from infrastructure.reconciliation import ReconciliationStore
+            ReconciliationStore(self.repository).failure(transport.generation, "PAPER_STARTUP_FAILED")
+            transport.close()
+            raise
+
+    def ingest_callbacks(self, *, applied_at):
+        """Persist the entire raw batch before normalization/lifecycle/accounting.
+
+        Caller authority and broker facts remain distinct; failures block further work.
+        """
+        from broker.ibkr.recovery import PersistentIBKRInbox
+        from infrastructure.reconciliation import ReconciliationStore
+        transport = self.adapter.transport
+        inbox = PersistentIBKRInbox(self.repository, transport.generation, self.adapter.config.client_id)
+        events = transport.read_events()
+        try:
+            for index, event in enumerate(events):
+                try:
+                    inbox.append(event)
+                except Exception:
+                    retain = getattr(transport, "retain_events", None)
+                    if retain is not None:
+                        retain(events[index:])
+                    raise
+            self.consume_inbox(inbox, applied_at=applied_at)
+        except Exception:
+            # Durable failure survives restart; malformed/foreign facts are never
+            # converted into local acknowledgements or silently adopted.
+            ReconciliationStore(self.repository).failure(transport.generation, "CALLBACK_INGESTION_FAILED")
+            raise
+        return len(events)
+
+    def reconcile_paper(self):
+        """Explicit bounded fresh query; does not resolve UNKNOWN or manufacture fills.
+
+        Caller authority and broker facts remain distinct; failures block further work.
+        """
+        from broker.ibkr.observation import map_snapshot, owned_identities
+        from infrastructure.reconciliation import ReconciliationStore
+        transport = self._execution_transport
+        if transport is None:
+            raise ValueError("explicit Paper session required")
+        store = ReconciliationStore(self.repository)
+        try:
+            transport._session_preflight()
+            snapshot = map_snapshot(transport.query_snapshot())
+            report = store.reconcile(snapshot, owned_identities)
+            if store.blocked():
+                raise ValueError("Paper reconciliation requires review")
+            transport.accept_reconciliation(report, self.repository)
+            return report
+        except Exception:
+            store.failure(transport.generation, "PAPER_RECONCILIATION_FAILED")
             raise

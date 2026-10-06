@@ -72,7 +72,7 @@ date, open, high, low, close, volume
 AI-Quant-Lab/
 ├── main.py              # End-to-end historical data pipeline
 ├── config/              # Environment and path configuration
-├── broker/              # Read-only market data; ibkr/ execution adapter with locked transport
+├── broker/              # Read-only market data; explicit opt-in Paper execution boundary
 ├── data/
 │   ├── validation.py    # Data-quality rules
 │   ├── processing.py    # Deterministic market-data normalization
@@ -281,11 +281,11 @@ English: This is not an autonomous live trading system. Real-money trading, auto
 
 ### 中文
 
-项目当前真实 IBKR 通道只允许显式只读访问，订单 transport 锁闭。端口和 readonly 参数不是 Paper 证明；查询连接也必须核对配置与账户。Paper Trading 自动执行和 Live Trading 都必须经过独立设计、安全审查与明确人工批准。
+历史行情与 ReadOnlyIBKRTransport 继续只读；Phase 3K 新的 PaperExecutionTransport 默认锁闭，仅在双重显式 opt-in、确切账户人工确认与 durable 授权满足后允许受控 BUY。端口和 readonly 参数不是 Paper 证明；查询连接也必须核对配置与账户。Paper Trading 自动执行和 Live Trading 都必须经过独立设计、安全审查与明确人工批准。
 
 ### English
 
-Real IBKR access remains explicitly read-only and order transport is locked. Neither a port nor the readonly argument proves Paper safety; the dedicated observation session validates configuration and accounts. Automated paper execution and live trading require separate design, safety review, and explicit human approval.
+Historical access and ReadOnlyIBKRTransport remain read-only. Phase 3K adds a separately constructed, default-locked PaperExecutionTransport for explicitly authorized BUY orders. Neither a port nor the readonly argument proves Paper safety; the dedicated observation session validates configuration and accounts. Automated paper execution and live trading require separate design, safety review, and explicit human approval.
 
 中文：3I 安全修复采用一次性 PlanningTicket 绑定组合 revision、计划和风险决策；SQLite v2 强制 broker identity 唯一归属、跨会话 correction-family 拒绝，并以固定 Decimal context 重建组合。修复已随 Phase 3I 合并。
 English: The 3I pre-commit fixes bind a one-use PlanningTicket to portfolio revision, plan and risk decision. SQLite v2 enforces broker ownership and cross-session correction-family rejection; accounting uses a fixed Decimal context. These fixes are merged with Phase 3I.
@@ -293,6 +293,18 @@ English: The 3I pre-commit fixes bind a one-use PlanningTicket to portfolio revi
 
 ## Phase 3J — IBKR Paper Execution & Reconciliation Foundation
 
-中文：本地 feature branch 开发，未提交。增加显式只读 session、raw broker observation mapping、强身份 outstanding-order reconciliation 和 durable results。CONNECTED 不等于 READY；READY 不授予发送权限。MATCHED/BROKER_ONLY/LOCAL_ONLY/CONFLICT/UNKNOWN 均为证据判断，不自动修改订单、成交或持仓。未知、缺失和冲突保守阻断；没有自动 resend/retry。真实 place/cancel 仍锁闭，项目仍不是 live 或无人值守 Paper Trading system。版本保持 v0.10。
+中文：已通过 PR #11 合并（`bdf08e8`，feature `a74e0cd`）。增加显式只读 session、raw broker observation mapping、强身份 outstanding-order reconciliation 和 durable results。CONNECTED 不等于 READY；READY 不授予发送权限。MATCHED/BROKER_ONLY/LOCAL_ONLY/CONFLICT/UNKNOWN 均为证据判断，不自动修改订单、成交或持仓。未知、缺失和冲突保守阻断；没有自动 resend/retry。真实 place/cancel 仍锁闭，项目仍不是 live 或无人值守 Paper Trading system。版本保持 v0.10。
 
-English: Phase 3J adds explicit read-only sessions, neutral broker observations, strong-identity outstanding-order reconciliation and durable results. It is locally implemented and uncommitted. Connectivity is distinct from readiness; observations never authorize arbitrary local mutations. Real place/cancel remain locked, with no automatic resend, retry or background trading loop. See [IBKR reconciliation architecture and limits](docs/ibkr_reconciliation.md).
+English: Phase 3J adds explicit read-only sessions, neutral broker observations, strong-identity outstanding-order reconciliation and durable results. It was merged through PR #11 (`bdf08e8`, feature `a74e0cd`). Connectivity is distinct from readiness; observations never authorize arbitrary local mutations. Real place/cancel remain locked, with no automatic resend, retry or background trading loop. See [IBKR reconciliation architecture and limits](docs/ibkr_reconciliation.md).
+
+## Phase 3K — IBKR Paper Execution Loop Foundation
+
+中文：本地未提交、待 review，基线为 Phase 3J merge `bdf08e87804e0cc70a220e64b0dc97861f203dd3`。首次建立显式人工授权、fail-closed、crash-aware 的单笔 IBKR Paper BUY/MKT 执行链路。双重调用方 opt-in、当前会话确切账户人工 Paper 确认、SQLite claim/身份、raw callback inbox、费用完整 fill accounting 和 fresh reconciliation 缺一不可。ReadOnlyIBKRTransport 仍无条件锁闭。真实 SELL 因缺乏 broker inventory evidence 锁闭；真实 cancel 暂不开放。以上 3H–J 锁闭描述是各阶段历史范围。
+
+English: AI Quant Lab can perform an explicitly authorized, fail-closed, crash-aware IBKR Paper order execution loop. Online Paper integration is opt-in only. This is NOT automated trading, NOT strategy runtime, NOT Live Trading and NOT account/portfolio synchronization. No real TWS/order acceptance run has been performed during development. Paper type relies on independent operator confirmation; session endpoint/account evidence alone is not an account-type proof.
+
+See [controlled Paper loop, manual acceptance and limits](docs/paper_execution_loop.md). Phase 3L will separately address broker account/cash/position evidence; Phase 3M will address strategy runtime and universe configuration.
+
+### Phase 3K pre-commit audit
+
+Paper-only controlled BUY/MKT remains the scope. SELL/cancel remain locked; no account/portfolio synchronization, automatic strategy execution or Live execution entry was added. See [pre-commit safety findings](docs/phase3k_precommit_review_report.md) for fixes and current validation. Independent operator verification remains mandatory; endpoint/account signals are not cryptographically authoritative account-type evidence.

@@ -1,9 +1,12 @@
 """Guarded execution adapter without aggregate mutation. / 不修改 aggregate 的执行 adapter。"""
 
+from contextlib import nullcontext
+
 from broker.ibkr.config import PaperExecutionConfig, PaperSafetyError
 from broker.ibkr.mapping import EquityContractSpec, map_contract, map_order, prepare_order, validate_qualified
 from broker.ibkr.models import IBKROrderIdentity, IdentityRegistry, OrderBinding, integer
 from broker.ibkr.transport import IBKRTransport
+from broker.ibkr.paper_transport import PaperNotSentError
 from execution.adapter import DispatchOperation as Operation, DispatchOutcome as Outcome, DispatchResult
 from execution.dispatch import AttemptClaims, StaleIntentError
 from execution.models import ExecutionOrder
@@ -13,7 +16,7 @@ class IBKRPaperAdapter:
     """Map and dispatch saved intent through a shared claim/identity scope.
 
     调用方共享 claims/registry，并串行化订单保存与发送；adapter 不保存 aggregate。
-    The real transport is locked; offline fakes exercise the exact guarded boundary.
+    Read-only transport stays locked; the explicit Paper transport adds durable guards.
     No returned API value is interpreted as broker acknowledgement.
     """
 
@@ -32,6 +35,12 @@ class IBKRPaperAdapter:
         self.transport.preflight()
 
     def submit(self, order: ExecutionOrder) -> DispatchResult:
+        """Dispatch a saved authorized intent once."""
+        scope = getattr(self.transport, "_dispatch_scope", None)
+        with scope(order, self.claims, self.registry, self.config, self.spec) if scope else nullcontext():
+            return self._submit(order)
+
+    def _submit(self, order: ExecutionOrder) -> DispatchResult:
         """Submit a saved pending snapshot once; mapping/claim conflicts raise.
 
         保存意图先于副作用；发送前可证明未进入则 NOT_SENT，入口后异常为 DELIVERY_UNKNOWN。
@@ -58,13 +67,21 @@ class IBKRPaperAdapter:
             self.claims.claim(order, Operation.SUBMIT)
         except (PaperSafetyError, StaleIntentError) as exc:
             return DispatchResult(order.client_order_id, Operation.SUBMIT, Outcome.NOT_SENT, str(exc))
-        order_id = integer(self.transport.next_order_id(), "order_id", minimum=1)
-        identity = IBKROrderIdentity(self.config.account, self.config.client_id, order_id,
-                                     self.generation, order.client_order_id)
-        mapped.orderId = order_id
-        self.registry.register(OrderBinding(identity, order.request, contract.conId))
+        try:
+            order_id = integer(self.transport.next_order_id(), "order_id", minimum=1)
+            identity = IBKROrderIdentity(self.config.account, self.config.client_id, order_id,
+                                         self.generation, order.client_order_id)
+            mapped.orderId = order_id
+            self.registry.register(OrderBinding(identity, order.request, contract.conId))
+            self.claims.verify_current(order, Operation.SUBMIT)
+        except Exception as exc:
+            # A consumed claim stays consumed even when place was never entered.
+            return DispatchResult(order.client_order_id, Operation.SUBMIT, Outcome.NOT_SENT,
+                                  f"pre-send identity failure: {type(exc).__name__}: {exc}")
         try:
             self.transport.place(contract, mapped)
+        except PaperNotSentError as exc:
+            return DispatchResult(order.client_order_id, Operation.SUBMIT, Outcome.NOT_SENT, str(exc))
         except Exception as exc:
             # 中文：入口之后不能证明未送达；不根据异常类型猜测是否安全重试。
             # English: After entry, delivery cannot be disproved; never infer retry safety from exception type.

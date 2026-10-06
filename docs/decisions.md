@@ -557,3 +557,27 @@ English: Pure reconciliation reuses BrokerOrderObservation, never books quantity
 中文：一次性规划票据绑定完整计划、风险决策及组合 revision；schema v2 强制 broker 身份归属、跨会话修正族与定向佣金等待解除。整股 float 仅在 broker 数量边界转整数；固定 Decimal context 拒绝精度损失。无旧 schema 自动迁移，真实 transport 保持锁闭。
 
 English: Persist one-use PlanningTickets binding portfolio revision, complete plan and risk decision; validate freshness during preparation, dispatch and claim. SQLite schema v2 adds bidirectional broker ownership, cross-generation account/execution families and correlated observation resolution; v1 has no automatic migration. Canonicalize integral floats only at broker callback quantity boundaries. Resolve only commission waits matching accepted fills, retaining other UNKNOWN evidence. Rebuild portfolios under an explicit precision-50, ROUND_HALF_EVEN Decimal context; fail on precision loss without cent quantization. No correction accounting, automatic retry or transport unlocking is added.
+
+## Phase 3K — Controlled Paper boundary decisions
+
+- 保留 ReadOnlyIBKRTransport 的真实 submit/cancel/ID 锁；新增独立 PaperExecutionTransport，复用 owned IB、raw wrapper 与 session/query seams。
+- 默认关闭，必须同时具有 config PAPER/side-effect intent、双重调用方显式 opt-in、当前 generation/exact account 的独立人工 Paper 确认，以及 durable planning/risk/SubmissionAuthorization/claim/ownership。环境变量与 risk PASS 都不是人工授权。
+- 固定构造时 config/generation 快照，发送前反复核验实际 session endpoint 与 managed accounts；disconnect 使旧实例失效，不重连、不重发。
+- SQLite claim 在 qualification/order preparation/preflight 之后、分配 broker ID 之前永久提交；claim 后 NOT_SENT 也不释放，placeOrder 入口后的异常一律 UNKNOWN。
+- 真实 SELL 延后：local long inventory 不能证明 broker long inventory，3K 不同步 positions，故无法保证 SELL 不开空。保留 broker-neutral SELL 映射；可信 broker inventory 交给 3L。
+- 真实 cancellation 延后：保留已有离线 lifecycle/adapter API，真实入口锁闭，不牺牲 uncertain cancel 的状态正确性。
+- 新增薄 runner startup/ingestion/fresh-query 编排和非 pytest 自动入口的有界人工验收函数；pytest 的真实订单禁用规则保持不变。
+- 只允许 fee-complete full fills 定向审计解决确切身份匹配的历史 pending/held/completion hints。保留 raw observations；不清除 UNKNOWN、disconnect、quantity conflict 或其他未知证据。
+- Paper 类型是独立人工部署确认的信任输入；Socket session endpoint/account evidence 不提供可靠 Paper/Live 类型证明，不宣称能识别虚假确认或任意重配 TWS。
+
+English: Phase 3K is the first controlled Paper side-effect capability. Online Paper integration is opt-in only. It is not automated trading, strategy runtime, Live Trading, or account/portfolio synchronization. Phase 3J was merged in PR #11 (`bdf08e8`, feature `a74e0cd`); Phase 3K remains local and uncommitted pending review. No real online order acceptance was performed.
+
+## Pre-commit safety audit / 提交前安全审查
+
+发送 scope 已改为内部 `_dispatch_scope`，入口验证尚未消费的 durable claim，避免用已消费 claim 重入并绕过 adapter；公开 `place/next_order_id` 没有内部 scope 时仍拒绝。边界使用确切 OrderSide.BUY，并重新核对获授权 instrument 与 spec。连接期 disconnect、connectivity/recovery notice 或未知诊断永久退役该 generation，连接返回不得恢复权限。
+
+未知 broker diagnostic 在 durable inbox replay 阶段保存 review-required blocker，所以即使在 raw commit 后、normalization 前崩溃，重启重放也不会因无订单关联而清除阻塞。信息类通知不会伪造未知状态。所有发送与重放仍是人工显式编排，没有 retry、SELL、cancel 或新功能。
+
+Paper-only evidence remains operator-dependent; there is no cryptographically authoritative broker account type proof. Private IB objects/internal state are trusted application internals, not a security sandbox against arbitrary Python mutation. The library connection bootstrap may cache account/position responses in its own IB object; Phase 3K never consumes them as local cash/NAV/position truth or synchronizes them into local accounting.
+
+Review evidence and verdict: [Phase 3K Pre-Commit Review Report](phase3k_precommit_review_report.md).

@@ -200,6 +200,27 @@ class SQLiteExecutionRepository:
                                "AND unresolved=1 AND resolved_at IS NULL",
                                (applied_at.isoformat(), fill.fill_id.value, order.client_order_id.value,
                                 fill.broker_execution_id.value))
+            # Fee-complete full fills can corroborate narrowly identified lifecycle
+            # hints. Keep every raw observation and an explicit resolution audit;
+            # never clear UNKNOWN, disconnects or quantity/identity conflicts.
+            filled = result.order
+            if filled.state is State.FILLED and filled.broker_order_id is not None:
+                rows = db.execute("SELECT seq,payload,reason FROM observations WHERE order_id=? "
+                                  "AND unresolved=1 AND resolved_at IS NULL "
+                                  "AND reason IN ('pending','held','completion')",
+                                  (filled.client_order_id.value,)).fetchall()
+                for seq, candidate_payload, candidate_reason in rows:
+                    candidate = self.codec.loads(candidate_payload)
+                    if (candidate.request != filled.request
+                            or candidate.broker_order_id != filled.broker_order_id):
+                        continue
+                    if candidate_reason == 'completion':
+                        if candidate.reported_filled_quantity not in (None, filled.request.quantity):
+                            continue
+                    elif candidate.observed_at > filled.updated_at:
+                        continue
+                    db.execute("UPDATE observations SET resolved_at=?,resolved_by=? WHERE seq=?",
+                               (applied_at.isoformat(), 'fee-complete:' + filled.fills[-1].fill_id.value, seq))
             return result
 
     def unresolved_observations(self) -> tuple[ExecutionObservation, ...]:

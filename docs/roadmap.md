@@ -216,8 +216,22 @@ English: Merged through PR #10 (`574d1a5`). Current scope is SQLite execution st
 
 ### Phase 3J — IBKR Paper Execution & Reconciliation Foundation
 
-中文：当前本地实现，未提交。显式只读查询、session readiness、broker-neutral observation、保守强身份匹配与 durable reconciliation；不自动修复本地状态、不重发 UNKNOWN、不解锁真实 transport。详见 [架构与限制](ibkr_reconciliation.md)。
-English: Current local, uncommitted work: explicit read-only queries, session readiness, neutral observations, strong-identity matching and durable reconciliation. No automatic repair/resend or real transport unlocking. Further recovery/approval work requires a separate phase.
+中文：已通过 PR #11 合并（merge `bdf08e8`，feature `a74e0cd`）。显式只读查询、session readiness、broker-neutral observation、保守强身份匹配与 durable reconciliation；不自动修复本地状态、不重发 UNKNOWN、不解锁真实 transport。详见 [架构与限制](ibkr_reconciliation.md)。
+English: Merged through PR #11 (merge `bdf08e8`, feature `a74e0cd`): explicit read-only queries, session readiness, neutral observations, strong-identity matching and durable reconciliation. No automatic repair/resend or real transport unlocking. Further recovery/approval work requires a separate phase.
+
+### Phase 3K — IBKR Paper Execution Loop Foundation
+
+中文：本地实现、未提交、待 review。首次受控真实 Paper BUY/MKT capability，要求双重显式 opt-in、当前会话确切账户人工确认、独立 SubmissionAuthorization、durable claim/身份、raw callbacks、fill accounting 和 fresh reconciliation。只读通道保持锁闭；真实 SELL 因缺乏 broker inventory 证据锁闭，真实 cancel 延后。不包含自动策略、Live 或账户同步。Online Paper integration is opt-in only. 详见 [执行链路](paper_execution_loop.md)。
+
+English: First controlled, default-locked Paper side-effect capability; no automatic retry/reconnect/resend. The local implementation has offline evidence, not real online acceptance evidence. Independent operator Paper confirmation is a trust input, not broker account-type proof.
+
+### Phase 3L — IBKR Account / Cash / Position Evidence
+
+独立设计 broker account/cash/position observation、provenance 和 local-vs-broker 差异核对，禁止用 NAV 静默覆盖 local cash。可信 broker inventory 是真实 SELL long-only 保护的前提；同时评审人工恢复和真实 cancel 边界。
+
+### Phase 3M — Strategy Runtime / Universe / Trading Configuration
+
+策略 runtime、universe 与显式 trading configuration；不在 3K 提前实现，不默认赋予自动提交权限。
 
 ## Phase 4+：Options Capability Track / 期权能力主线
 
@@ -329,3 +343,5 @@ Options 在股票 Paper Trading 架构边界清晰后进入主线，并复用已
 前置依赖：Phase 3I Paper Trading 已充分验证，并获得用户针对 Live Trading 的明确专项授权。
 
 完成标准：此阶段的具体标准必须在进入前重新设计和审批。路线图中列出该阶段不构成任何真实交易授权。
+
+Phase 3K pre-commit audit strengthens claim-scope admission, BUY/spec validation, irreversible session retirement and durable unknown-diagnostic replay. It adds no trading capability. SELL/cancel and Phase 3L account/position synchronization remain deferred. See [review report](phase3k_precommit_review_report.md).

@@ -6,6 +6,7 @@
 from dataclasses import replace
 import json
 
+from broker.ibkr.errors import ErrorCategory, classify_error
 from broker.ibkr.events import IBKREventNormalizer
 from broker.ibkr.models import (
     CommissionEvent, ErrorEvent, EventSource, ExecutionEvent, IBKROrderIdentity,
@@ -111,6 +112,11 @@ class PersistentIBKRInbox:
         executions, commissions = set(), set()
         for _, payload in entries:
             event = BROKER_CODEC.loads(payload)
+            if isinstance(event, ErrorEvent) and classify_error(event.code)[0] is ErrorCategory.UNKNOWN:
+                # Replay must recreate the blocker after a crash between raw
+                # persistence and normalization, before acknowledging the batch.
+                from infrastructure.reconciliation import ReconciliationStore
+                ReconciliationStore(self.repository).failure(self.generation, "UNCLASSIFIED_BROKER_DIAGNOSTIC")
             normalized = normalizer.normalize(event)
             if isinstance(event, ExecutionEvent):
                 family, separator, revision = event.exec_id.rpartition(".")

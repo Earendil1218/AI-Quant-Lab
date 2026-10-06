@@ -137,6 +137,7 @@ class IBKREventNormalizer:
         self._executions.setdefault(event.exec_id, event)
         if event.exec_id not in self._commissions:
             return self._observation(binding, Kind.EXECUTION_PENDING, event.observed_at,
+                                     pending_execution_id=execution_ids(event.account, event.exec_id)[0],
                                      detail="execution received; commission unresolved")
         return self._paired(event.exec_id)
 

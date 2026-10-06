@@ -531,3 +531,29 @@ English: Use broker/ibkr to contain ib-insync 0.9.86 raw callbacks, contracts an
 English: Persistence, recovery, approval workflow, a runner, outstanding-order planning, periodic/portfolio reconciliation and audit/monitoring remain Phase 3I. New CommissionAndFeesReport APIs are a future migration topic, not a change to current economics. Critical APIs, safety WHY comments and Phase 3H documents must remain bilingual.
 
 详细设计与依据 / Detailed design and sources: [IBKR execution foundation](ibkr_execution.md).
+
+## 2026-10-06：Phase 3I SQLite persistence / 持久化与恢复
+
+中文：选用标准库 SQLite，避免 ORM 与外部服务；domain model 与 repository protocol 保持稳定，SQLite 位于 `infrastructure`，薄 runner 位于 `application`。一个数据库对应一个执行/组合作用域，调用方串行化 planning/dispatch/state writes。金额用 Decimal 字符串，时间保留原语义，固定类型 JSON 不使用 pickle。
+
+English: Choose standard-library SQLite without an ORM or external service. Keep domain models/repository protocols stable; place SQLite in `infrastructure` and the thin runner in `application`. One database represents one execution/portfolio scope with serialized planning/dispatch/state writes. Decimal uses strings; timestamps retain their semantics; allowlisted JSON replaces pickle.
+
+中文：aggregate version、接受的 Fill 和去重身份同事务保存；`UPDATE ... WHERE version=?` 拒绝 stale writer。claim 原子绑定已保存 pending 快照，在 transport 前提交，不提供释放接口。claim 后崩溃保留原生命周期并分类为 RECONCILIATION_REQUIRED；UNKNOWN 不是 FAILED，不允许自动 resubmit。
+
+English: Aggregate version, accepted fills and dedup identities commit together; version-qualified UPDATE rejects stale writers. A claim atomically binds the saved pending snapshot and commits before transport with no release API. Post-claim crashes preserve lifecycle and classify as RECONCILIATION_REQUIRED. UNKNOWN is not FAILED and never permits automatic resubmit.
+
+中文：Fill ledger 与唯一 accounting marker 解决成交/记账缺口。组合由初始现金和已记账 Fill 重建；补记在单独事务中验证全部经济变动并保存标记，不在提交前修改外部组合。原始 callback 先持久化，再重建既有 normalizer；固定批次观察提交后才标记 inbox 已处理。无论 inbox marker 前后崩溃，经济去重保持有效。
+
+English: A fill ledger and unique accounting markers close the execution/accounting gap. Portfolios rebuild from initial cash and accounted fills. A separate accounting transaction validates economics and saves markers without mutating external portfolios before commit. Raw callbacks persist before reconstructing the existing normalizer; a fixed inbox batch is acknowledged only after neutral observations commit. Economic dedup survives crashes on either side of inbox acknowledgement.
+
+中文：纯 reconciliation 复用 BrokerOrderObservation，不根据 quantity snapshot 记账，也不根据 missing 订单自动重发。较旧 ack 不清除新的 UNKNOWN；未决观察保守锁存，除下述精确匹配的佣金等待外无清除 API。真实 transport 仍锁闭，未实现网络 runner、审批 workflow、自动 retry、完整 reconciliation loop、多进程协调和 HA。SQLite 不与 broker 形成分布式事务。
+
+English: Pure reconciliation reuses BrokerOrderObservation, never books quantity snapshots or resends missing orders. Old acknowledgement replay cannot clear newer UNKNOWN; unresolved observations remain latched except for the correlated commission waits described below. Real transport stays locked. Network runners, approval workflows, automatic retry, full reconciliation loops, multi-process coordination and HA remain excluded. SQLite does not create a distributed transaction with the broker.
+
+设计、故障窗口与测试依据 / Design, crash windows and test evidence: [execution recovery](execution_recovery.md).
+
+## 2026-10-06: Phase 3I pre-commit safety fixes / 提交前安全修复
+
+中文：一次性规划票据绑定完整计划、风险决策及组合 revision；schema v2 强制 broker 身份归属、跨会话修正族与定向佣金等待解除。整股 float 仅在 broker 数量边界转整数；固定 Decimal context 拒绝精度损失。无旧 schema 自动迁移，真实 transport 保持锁闭。
+
+English: Persist one-use PlanningTickets binding portfolio revision, complete plan and risk decision; validate freshness during preparation, dispatch and claim. SQLite schema v2 adds bidirectional broker ownership, cross-generation account/execution families and correlated observation resolution; v1 has no automatic migration. Canonicalize integral floats only at broker callback quantity boundaries. Resolve only commission waits matching accepted fills, retaining other UNKNOWN evidence. Rebuild portfolios under an explicit precision-50, ROUND_HALF_EVEN Decimal context; fail on precision loss without cent quantization. No correction accounting, automatic retry or transport unlocking is added.

@@ -1,5 +1,8 @@
 """Public broker-neutral execution lifecycle API."""
 
+from execution.recovery import RecoveryAction, RecoveryCandidate, StalePlanningDecision, classify_recovery
+from execution.reconciliation import ReconciliationDecision, ReconciliationAssessment, assess_reconciliation
+
 from execution.lifecycle import (
     apply_broker_order_observation,
     authorize_execution_order,
@@ -39,6 +42,9 @@ from execution.observations import (
 )
 
 __all__ = [
+    "RecoveryAction", "RecoveryCandidate", "classify_recovery",
+    "StalePlanningDecision",
+    "ReconciliationDecision", "ReconciliationAssessment", "assess_reconciliation",
     "DispatchOperation", "DispatchOutcome", "DispatchResult", "ExecutionBrokerAdapter",
     "AttemptClaim", "AttemptClaims", "InMemoryAttemptClaims", "ExecutionObservation",
     "ObservationApplication", "ObservationKind", "apply_dispatch_result", "apply_execution_observation",

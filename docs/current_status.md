@@ -7,14 +7,14 @@
 ### 中文
 
 - 版本：AI Quant Lab v0.10
-- Roadmap：Phase 3J — IBKR Paper Execution & Reconciliation Foundation（本地实现，未提交，待 review）
-- 基线状态：Phase 3H completed and merged，implementation `d73308d`，PR #9 merge `6319e98`；v0.10。Phase 3I 已通过 PR #10 合并（`574d1a5`），当前开发 Phase 3J；在线只读 integration 尚无正式验收证据，真实订单 transport 仍 fail-closed。
+- Roadmap：Phase 3K — IBKR Paper Execution Loop Foundation（本地实现，未提交，待 review）
+- 基线状态：Phase 3H completed and merged，implementation `d73308d`，PR #9 merge `6319e98`；v0.10。Phase 3I 已通过 PR #10 合并（`574d1a5`），Phase 3J 已通过 PR #11 合并（`bdf08e8` / `a74e0cd`）。当前 Phase 3K 增加默认锁闭的受控 Paper BUY；没有真实在线验收证据。
 
 ### English
 
 - Version: AI Quant Lab v0.10
-- Roadmap: Phase 3J — IBKR Paper Execution & Reconciliation Foundation (implemented locally, uncommitted, awaiting review)
-- Baseline: Phase 3H completed and merged, implementation `d73308d`, PR #9 merge `6319e98`; v0.10. Phase 3I is merged through PR #10 (`574d1a5`); Phase 3J is current local work. Online read-only integration has no formal acceptance evidence; real order transport remains fail-closed.
+- Roadmap: Phase 3K — IBKR Paper Execution Loop Foundation (implemented locally, uncommitted, awaiting review)
+- Baseline: Phase 3H completed and merged, implementation `d73308d`, PR #9 merge `6319e98`; v0.10. Phase 3I is merged through PR #10 (`574d1a5`); Phase 3J is merged through PR #11 (`bdf08e8` / `a74e0cd`). Phase 3K adds default-locked controlled Paper BUY capability; there is no real online acceptance evidence.
 
 ## 已完成 / Completed
 
@@ -175,7 +175,7 @@
 - 尚未设计多交易所 calendar policy。
 - 当前 backtest 仅支持 single-equity、daily、long/flat、fixed quantity、next-open execution；尚未实现 Options、Greeks 或 advanced portfolio risk。
 - 不支持自动化 Paper Trading 或 Live Trading。
-- IBKR adapter 真实订单 transport 仍锁闭。3I 提供 SQLite repository/claim、显式恢复、成交重放与最小离线 runner；未完成订单会阻止新规划，但不提供净额调整或完整 outstanding-order-aware planning。human approval workflow、automatic retry、broker/local portfolio reconciliation、monitoring、alerts 和 OMS 未实现。
+- ReadOnlyIBKRTransport 与真实 cancel/SELL 仍锁闭；新的 PaperExecutionTransport 支持显式授权 BUY。3I 提供 SQLite repository/claim、显式恢复、成交重放与最小离线 runner；未完成订单会阻止新规划，但不提供净额调整或完整 outstanding-order-aware planning。human approval workflow、automatic retry、broker/local portfolio reconciliation、monitoring、alerts 和 OMS 未实现。
 - fake 已覆盖连接、qualification 和错误边界；Phase 3H 尚未进行在线验证。
 
 ### English
@@ -187,7 +187,7 @@
 - No multi-exchange calendar policy has been designed.
 - Backtesting is limited to single-equity, daily, long/flat, fixed-quantity, next-open execution; options, Greeks, and advanced portfolio risk are not implemented.
 - Automated paper trading and live trading are not supported.
-- Real order transport remains locked. Phase 3I provides SQLite repositories/claims, explicit recovery, fill replay and a minimal offline runner. Outstanding executions block new planning; there is no netting or full outstanding-order-aware planner. Approval workflows, automatic retry, broker/local portfolio reconciliation, monitoring, alerts and an OMS are not implemented.
+- ReadOnlyIBKRTransport and real cancel/SELL remain locked; Phase 3K supports explicitly authorized Paper BUY. Phase 3I provides SQLite repositories/claims, explicit recovery, fill replay and a minimal offline runner. Outstanding executions block new planning; there is no netting or full outstanding-order-aware planner. Approval workflows, automatic retry, broker/local portfolio reconciliation, monitoring, alerts and an OMS are not implemented.
 - Fake transport covers connection, qualification and error boundaries; Phase 3H has not been verified online.
 
 ## Phase 3H / IBKR Paper Execution Adapter Foundation
@@ -216,21 +216,30 @@ English: Only commission waits correlated with accepted fills are resolved, reta
 
 ## 下一步 / Next
 
-1. 人工审查 Phase 3J observation/reconciliation 与故障测试；本阶段尚未 commit/push/merge。
-2. 后续独立设计未决证据处置、审批 workflow、在线只读核对、完整 planning/reconciliation 与监控；真实 transport 保持锁闭。
-3. Options、增量更新、分钟线时区和 corporate actions 继续作为独立能力设计。
+1. Review Phase 3K code, offline evidence and trust limits; changes remain uncommitted.
+2. Only after separate explicit user authorization, perform one controlled Paper BUY acceptance in TWS.
+3. Phase 3L: broker account/cash/position evidence, discrepancies and verified long inventory; no silent local accounting overwrite.
+4. Phase 3M: strategy runtime/universe/configuration, outside the current work.
 
-1. Review Phase 3J observation/reconciliation and failure tests; no Phase 3J commit/push/merge has been performed.
-2. Separately design unresolved-evidence resolution, approval workflows, online read-only verification, full planning/reconciliation and monitoring; keep real transport locked.
-3. Keep options, incremental updates, intraday timezone semantics, and corporate actions as separate capabilities.
-
-当前安全限制保持不变：broker 只允许只读市场数据访问；broker-neutral 模拟订单不会提交到 IBKR，不包含自动执行。
-
-The safety boundary is unchanged: broker access remains read-only; broker-neutral simulated orders are never submitted to IBKR and no automated execution is included.
-
-## Phase 3J / Current local development
+## Phase 3J / Merged baseline
 
 中文：显式只读 session、broker-neutral observations、保守强身份核对与持久化结果；真实 transport 保持锁闭。3I 合并基线为 537 passed / 1 skipped。新增能力和限制见 [IBKR reconciliation](ibkr_reconciliation.md)。
 English: Adds explicit read-only session orchestration, neutral observations, conservative identity matching and durable reconciliation evidence. The merged 3I baseline is 537 passed / 1 skipped; real transport remains locked.
 
 Phase 3J 本地验证 / Local validation: 591 passed / 0 failed / 1 skipped；新增 54 项离线测试。唯一 skip 为既有 opt-in IBKR readonly integration。内存 compile 104 个 Python 文件、import 69 个 production modules；没有在线验收。
+
+## Phase 3K / Current local development
+
+中文：起始 main / origin-main tracking ref 均为 `bdf08e87804e0cc70a220e64b0dc97861f203dd3`；分支 `feature/phase-3k-ibkr-paper-execution-loop`。基线 591 passed / 0 failed / 1 skipped。新增独立 Paper transport、session 人工确认证据、发送前持久化 ownership、薄 runner callback/reconciliation 编排与手工 opt-in harness。Risk PASS 不创建 SubmissionAuthorization；UNKNOWN 不重发。真实 BUY 受控开放，真实 SELL/cancel 锁闭；账户/组合同步未实现。之前 3H–J 的“真实 transport 锁闭”描述均为历史范围。
+
+English: Phase 3K is the first controlled IBKR Paper side-effect capability, implemented locally and uncommitted. Online Paper integration is opt-in only. NOT automated trading, NOT strategy runtime, NOT Live Trading, NOT account/portfolio synchronization. All validation during development is offline; no real TWS connection, order or cancellation was made. See [Paper loop and trust limits](paper_execution_loop.md) and [development report](phase3k_development_report.md).
+
+Final Phase 3K offline validation: 637 passed / 0 failed / 1 skipped; 46 new cases. Compile: 107 Python files. Import: 70 production modules. No real TWS or order calls.
+
+### Phase 3K pre-commit review update
+
+Review found and fixed consumed-claim scope re-entry, connection-time generation revival, unknown-diagnostic readiness loss (including crash replay), and final request/spec consistency. Genuine planned SELL/recovered SELL/concurrent SELL and mutated-side tests verify the BUY-only lock. No SELL/cancel/Live/strategy/account-sync feature was enabled.
+
+The development snapshot above (637 passed, 46 new cases) is historical. Current validation and READY/NOT READY verdict are recorded in [pre-commit review report](phase3k_precommit_review_report.md).
+
+Final pre-commit review validation: 651 passed / 0 failed / 1 skipped; Phase 3K 60 cases (+14 review regressions); targeted 223 passed. Compile 107 files / import 70 modules; no attempted external I/O. git diff --check PASS. Verdict: READY FOR COMMIT as BUY-only controlled Paper foundation; still uncommitted.

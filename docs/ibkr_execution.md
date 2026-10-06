@@ -128,3 +128,21 @@ Transport contract: local ib-insync 0.9.86 source (`ib.py`, `wrapper.py`), pinne
 
 中文：上述旧 TWS 文档用于核对固定版本语义，不代表对最新 TWS 全版本兼容的声明。
 English: Historical TWS references support the pinned contract, not a claim of compatibility with every current TWS version.
+
+## Phase 3K integration / 受控执行扩展
+
+Phase 3J 已通过 PR #11 合并（`bdf08e8` / `a74e0cd`）。Phase 3K 基于该合并基线增加独立默认锁闭的 `PaperExecutionTransport` 与显式 application orchestration；以上 3H–J 的全锁闭描述是历史阶段范围，ReadOnlyIBKRTransport 本身仍然只读。
+
+Online Paper integration is opt-in only. Current-session exact-account human confirmation, two explicit caller opt-ins, persisted planning/risk/SubmissionAuthorization, SQLite claim and durable ownership are all required. Startup/fresh reconciliation uses the existing strong-identity comparison and evidence store; MATCH never clears UNKNOWN or creates a fill/approval. Fee-complete full fills can audit-resolve matching pending/held/completion hints only; identity/quantity conflicts and other uncertainty remain blocked.
+
+真实 BUY/MKT 受控开放；真实 SELL 因本地库存不等于 broker 库存保持锁闭，真实 cancel 也保持锁闭。没有自动重试/重连、Live、自动策略或账户同步；配置与 session evidence 不构成 broker 账户类型证明，仍需独立人工核验。详见 [完整执行链路与人工验收](paper_execution_loop.md)。开发验证全部离线，未调用真实 TWS/Paper order。
+
+## Pre-commit safety audit / 提交前安全审查
+
+发送 scope 已改为内部 `_dispatch_scope`，入口验证尚未消费的 durable claim，避免用已消费 claim 重入并绕过 adapter；公开 `place/next_order_id` 没有内部 scope 时仍拒绝。边界使用确切 OrderSide.BUY，并重新核对获授权 instrument 与 spec。连接期 disconnect、connectivity/recovery notice 或未知诊断永久退役该 generation，连接返回不得恢复权限。
+
+未知 broker diagnostic 在 durable inbox replay 阶段保存 review-required blocker，所以即使在 raw commit 后、normalization 前崩溃，重启重放也不会因无订单关联而清除阻塞。信息类通知不会伪造未知状态。所有发送与重放仍是人工显式编排，没有 retry、SELL、cancel 或新功能。
+
+Paper-only evidence remains operator-dependent; there is no cryptographically authoritative broker account type proof. Private IB objects/internal state are trusted application internals, not a security sandbox against arbitrary Python mutation. The library connection bootstrap may cache account/position responses in its own IB object; Phase 3K never consumes them as local cash/NAV/position truth or synchronizes them into local accounting.
+
+Review evidence and verdict: [Phase 3K Pre-Commit Review Report](phase3k_precommit_review_report.md).

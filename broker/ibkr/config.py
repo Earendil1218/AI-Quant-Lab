@@ -15,7 +15,7 @@ class PaperExecutionConfig:
 
     端口与 DU 前缀都不是 Paper 证明；allowlist 必须来自独立核验。
     Configuration is intent, not proof of account type or permission to trade.
-    Real order transport remains locked throughout Phase 3H.
+    ReadOnlyIBKRTransport stays locked; Phase 3K uses a separate explicit boundary.
     """
 
     mode: str = "DISABLED"

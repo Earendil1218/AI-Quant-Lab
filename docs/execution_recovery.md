@@ -112,3 +112,21 @@ Verification adds 35 cases: the full suite is 537 passed / 0 failed / 1 skipped.
 中文：上述修复将未发布的 runner API 改为持久化一次性票据，在 prepare、dispatch、claim 校验 freshness；仅 broker 数量允许合法整股 float 转整数。身份双向唯一约束与 evidence 同事务；修正族按账户跨会话持久化，冲突保留原始批次且不改变经济状态。佣金等待仅按订单与 execution 精确解除，保留审计，不解除其他 UNKNOWN。记账采用 precision=50、ROUND_HALF_EVEN 与精度损失 trap，不按分自动舍入。两个真实子进程退出测试不构成断电或多进程协调保证。
 
 Phase 3J extends this existing evidence/transaction seam with read-only query reconciliation; see [IBKR reconciliation](ibkr_reconciliation.md). 3J 不改变已有 claim、Fill 或记账语义。
+
+## Phase 3K integration / 受控执行扩展
+
+Phase 3J 已通过 PR #11 合并（`bdf08e8` / `a74e0cd`）。Phase 3K 基于该合并基线增加独立默认锁闭的 `PaperExecutionTransport` 与显式 application orchestration；以上 3H–J 的全锁闭描述是历史阶段范围，ReadOnlyIBKRTransport 本身仍然只读。
+
+Online Paper integration is opt-in only. Current-session exact-account human confirmation, two explicit caller opt-ins, persisted planning/risk/SubmissionAuthorization, SQLite claim and durable ownership are all required. Startup/fresh reconciliation uses the existing strong-identity comparison and evidence store; MATCH never clears UNKNOWN or creates a fill/approval. Fee-complete full fills can audit-resolve matching pending/held/completion hints only; identity/quantity conflicts and other uncertainty remain blocked.
+
+真实 BUY/MKT 受控开放；真实 SELL 因本地库存不等于 broker 库存保持锁闭，真实 cancel 也保持锁闭。没有自动重试/重连、Live、自动策略或账户同步；配置与 session evidence 不构成 broker 账户类型证明，仍需独立人工核验。详见 [完整执行链路与人工验收](paper_execution_loop.md)。开发验证全部离线，未调用真实 TWS/Paper order。
+
+## Pre-commit safety audit / 提交前安全审查
+
+发送 scope 已改为内部 `_dispatch_scope`，入口验证尚未消费的 durable claim，避免用已消费 claim 重入并绕过 adapter；公开 `place/next_order_id` 没有内部 scope 时仍拒绝。边界使用确切 OrderSide.BUY，并重新核对获授权 instrument 与 spec。连接期 disconnect、connectivity/recovery notice 或未知诊断永久退役该 generation，连接返回不得恢复权限。
+
+未知 broker diagnostic 在 durable inbox replay 阶段保存 review-required blocker，所以即使在 raw commit 后、normalization 前崩溃，重启重放也不会因无订单关联而清除阻塞。信息类通知不会伪造未知状态。所有发送与重放仍是人工显式编排，没有 retry、SELL、cancel 或新功能。
+
+Paper-only evidence remains operator-dependent; there is no cryptographically authoritative broker account type proof. Private IB objects/internal state are trusted application internals, not a security sandbox against arbitrary Python mutation. The library connection bootstrap may cache account/position responses in its own IB object; Phase 3K never consumes them as local cash/NAV/position truth or synchronizes them into local accounting.
+
+Review evidence and verdict: [Phase 3K Pre-Commit Review Report](phase3k_precommit_review_report.md).

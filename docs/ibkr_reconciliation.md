@@ -1,8 +1,8 @@
 # Phase 3J — IBKR Paper Execution & Reconciliation Foundation
 
-中文：基线为 Phase 3I merge `574d1a55aa7b1790cb24a0727da0ea0c58653736`，本阶段未提交。版本保留 v0.10，不建立新发布策略。真实 place/cancel 始终锁闭，未进行在线验收。
+中文：基线为 Phase 3I merge `574d1a55aa7b1790cb24a0727da0ea0c58653736`，Phase 3J 已通过 PR #11 合并（`bdf08e8` / `a74e0cd`）。版本保留 v0.10，不建立新发布策略。Phase 3J 的真实 place/cancel 保持锁闭；Phase 3K 受控 BUY 见下文，未进行在线验收。
 
-English: This is a read-only observation and recovery foundation, not an autonomous live or Paper trading system. Real submission and cancellation remain unconditionally locked. No automatic retry, resend, cancellation, position repair or approval is introduced.
+English: This is a read-only observation and recovery foundation, not an autonomous live or Paper trading system. In Phase 3J, real submission and cancellation remained unconditionally locked; Phase 3K adds a separate controlled BUY boundary. No automatic retry, resend, cancellation, position repair or approval is introduced.
 
 ## Data flow / 数据流
 
@@ -68,3 +68,22 @@ Offline tests use real SQLite stores, fake sessions and the existing network/ord
 Deferred to separately authorized work: verified online/manual connectivity acceptance, broker history gap recovery, completed-order queries, explicit uncertainty resolution/repair, safe cross-session recovery when permanent identity is absent, fee-complete cross-session ingestion, approval workflow, schema migration tooling, real order unlocking, continuous reconciliation, multi-process coordination, monitoring and HA. No Phase 4 capability is added.
 
 Local validation: 591 passed / 0 failed / 1 skipped (54 new cases); compile 104 Python files and import 69 production modules. The only skip remains the existing opt-in readonly online test. No lint/type-check configuration is present in the repository.
+
+
+## Phase 3K integration / 受控执行扩展
+
+Phase 3J 已通过 PR #11 合并（`bdf08e8` / `a74e0cd`）。Phase 3K 基于该合并基线增加独立默认锁闭的 `PaperExecutionTransport` 与显式 application orchestration；以上 3H–J 的全锁闭描述是历史阶段范围，ReadOnlyIBKRTransport 本身仍然只读。
+
+Online Paper integration is opt-in only. Current-session exact-account human confirmation, two explicit caller opt-ins, persisted planning/risk/SubmissionAuthorization, SQLite claim and durable ownership are all required. Startup/fresh reconciliation uses the existing strong-identity comparison and evidence store; MATCH never clears UNKNOWN or creates a fill/approval. Fee-complete full fills can audit-resolve matching pending/held/completion hints only; identity/quantity conflicts and other uncertainty remain blocked.
+
+真实 BUY/MKT 受控开放；真实 SELL 因本地库存不等于 broker 库存保持锁闭，真实 cancel 也保持锁闭。没有自动重试/重连、Live、自动策略或账户同步；配置与 session evidence 不构成 broker 账户类型证明，仍需独立人工核验。详见 [完整执行链路与人工验收](paper_execution_loop.md)。开发验证全部离线，未调用真实 TWS/Paper order。
+
+## Pre-commit safety audit / 提交前安全审查
+
+发送 scope 已改为内部 `_dispatch_scope`，入口验证尚未消费的 durable claim，避免用已消费 claim 重入并绕过 adapter；公开 `place/next_order_id` 没有内部 scope 时仍拒绝。边界使用确切 OrderSide.BUY，并重新核对获授权 instrument 与 spec。连接期 disconnect、connectivity/recovery notice 或未知诊断永久退役该 generation，连接返回不得恢复权限。
+
+未知 broker diagnostic 在 durable inbox replay 阶段保存 review-required blocker，所以即使在 raw commit 后、normalization 前崩溃，重启重放也不会因无订单关联而清除阻塞。信息类通知不会伪造未知状态。所有发送与重放仍是人工显式编排，没有 retry、SELL、cancel 或新功能。
+
+Paper-only evidence remains operator-dependent; there is no cryptographically authoritative broker account type proof. Private IB objects/internal state are trusted application internals, not a security sandbox against arbitrary Python mutation. The library connection bootstrap may cache account/position responses in its own IB object; Phase 3K never consumes them as local cash/NAV/position truth or synchronizes them into local accounting.
+
+Review evidence and verdict: [Phase 3K Pre-Commit Review Report](phase3k_precommit_review_report.md).

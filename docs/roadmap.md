@@ -210,9 +210,14 @@ English: Phase 3H completed and merged: implementation `d73308d`, PR #9 merge `6
 
 ### Phase 3I — Paper Trading Runner & Recovery Foundation
 
-中文：已在独立 feature branch 本地实现，未提交、待 review。当前范围为 SQLite execution repository、持久化 claim、成交去重、记账恢复、callback inbox/身份恢复、纯 reconciliation 比较和最小显式离线 runner。claim 后不确定性要求核对，绝不自动重发。未决证据保守阻断规划；真实 Paper transport 继续锁闭。完整人工审批 workflow、周期/组合 reconciliation、审计运营系统、监控和 alerts 留待独立阶段；不包含 Live Trading、options execution、多进程协调或 HA。
+中文：已通过 PR #10 合并（`574d1a5`）。当前范围为 SQLite execution repository、持久化 claim、成交去重、记账恢复、callback inbox/身份恢复、纯 reconciliation 比较和最小显式离线 runner。claim 后不确定性要求核对，绝不自动重发。未决证据保守阻断规划；真实 Paper transport 继续锁闭。完整人工审批 workflow、周期/组合 reconciliation、审计运营系统、监控和 alerts 留待独立阶段；不包含 Live Trading、options execution、多进程协调或 HA。
 
-English: Implemented locally on its feature branch, uncommitted and awaiting review. Current scope is SQLite execution storage, durable claims, fill dedup/accounting recovery, callback inbox/identity recovery, pure reconciliation assessment and minimal explicit offline runner orchestration. Post-claim uncertainty requires reconciliation, never automatic resend. Unresolved evidence blocks planning; real Paper transport stays locked. Full approval workflows, periodic/portfolio reconciliation, operational auditing, monitoring and alerts remain separate work. Live trading, options execution, multi-process coordination and HA are excluded.
+English: Merged through PR #10 (`574d1a5`). Current scope is SQLite execution storage, durable claims, fill dedup/accounting recovery, callback inbox/identity recovery, pure reconciliation assessment and minimal explicit offline runner orchestration. Post-claim uncertainty requires reconciliation, never automatic resend. Unresolved evidence blocks planning; real Paper transport stays locked. Full approval workflows, periodic/portfolio reconciliation, operational auditing, monitoring and alerts remain separate work. Live trading, options execution, multi-process coordination and HA are excluded.
+
+### Phase 3J — IBKR Paper Execution & Reconciliation Foundation
+
+中文：当前本地实现，未提交。显式只读查询、session readiness、broker-neutral observation、保守强身份匹配与 durable reconciliation；不自动修复本地状态、不重发 UNKNOWN、不解锁真实 transport。详见 [架构与限制](ibkr_reconciliation.md)。
+English: Current local, uncommitted work: explicit read-only queries, session readiness, neutral observations, strong-identity matching and durable reconciliation. No automatic repair/resend or real transport unlocking. Further recovery/approval work requires a separate phase.
 
 ## Phase 4+：Options Capability Track / 期权能力主线
 
